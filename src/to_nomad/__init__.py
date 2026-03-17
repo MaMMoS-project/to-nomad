@@ -51,6 +51,8 @@ Quick-start example
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -183,6 +185,16 @@ def _infer_mammos_csv_header_row(
     return None
 
 
+def _safe_to_nomad_version() -> str:
+    """Return installed to-nomad package version, or empty string."""
+    try:
+        return importlib_metadata.version("to-nomad")
+    except importlib_metadata.PackageNotFoundError:
+        return ""
+    except Exception:
+        return ""
+
+
 def to_nomad(
     data: mammos_entity.EntityCollection | mammos_entity.Entity | str | Path,
     output: str | Path = "output.archive.yaml",
@@ -195,6 +207,8 @@ def to_nomad(
     file_reference_mode: bool = False,
     hdf_entity_names: list[str] | None = None,
     include_mammos_entities_metadata: bool | None = None,
+    include_mammos_entity_version: bool = True,
+    include_nomad_generation_metadata: bool = True,
     include_ontology_in_yaml: bool | None = None,
     **metadata: str,
 ) -> Path:
@@ -270,6 +284,13 @@ def to_nomad(
             Controls whether the explicit ``mammos_entities`` subsection is
             included. In ``hdf_reference_mode`` the default is ``False`` to
             avoid duplication with HDF-stored attributes.
+        include_mammos_entity_version:
+            If ``True`` (default), include ``mammos_entity_version`` in the
+            schema quantities and data block.
+        include_nomad_generation_metadata:
+            If ``True`` (default), include ``nomad_generation`` subsection with
+            conversion provenance (UTC timestamp, source file/format, source and
+            runtime mammos-entity versions, to-nomad version).
         include_ontology_in_yaml:
             Controls whether ontology label/IRI are repeated in quantity
             descriptions. In ``hdf_reference_mode`` the default is ``False``.
@@ -426,6 +447,11 @@ def to_nomad(
     extra_base_sections: list[str] = []
     include_entity_values = True
     hdf_meta: dict | None = None
+    source_mammos_entity_version = ""
+
+    runtime_mammos_entity_version = ""
+    if include_nomad_generation_metadata:
+        runtime_mammos_entity_version = getattr(me, "__version__", "") or ""
 
     if source_path and source_suffix in {".hdf5", ".h5", ".hdf"}:
         # Read once and reuse for metadata embedding and top-level overrides.
@@ -438,7 +464,11 @@ def to_nomad(
         # This avoids reporting the converter package version when the source
         # file carries its own mammos_entity_version attribute.
         if isinstance(file_attrs.get("mammos_entity_version"), str):
-            extra_data["mammos_entity_version"] = file_attrs["mammos_entity_version"]
+            source_mammos_entity_version = file_attrs["mammos_entity_version"]
+            if include_mammos_entity_version:
+                extra_data["mammos_entity_version"] = file_attrs[
+                    "mammos_entity_version"
+                ]
 
         # If the caller did not provide description explicitly and no collection
         # description was recovered, use the HDF root description attribute.
@@ -469,6 +499,17 @@ def to_nomad(
         extra_data["data_file"] = source_path.name
 
         dataset_paths = _hdf_dataset_paths(source_path)
+        dataset_attrs_by_path: dict[str, dict] = {}
+        if isinstance(hdf_meta, dict) and isinstance(hdf_meta.get("nodes"), list):
+            for node in hdf_meta["nodes"]:
+                if not isinstance(node, dict):
+                    continue
+                if node.get("type") != "dataset":
+                    continue
+                path = node.get("path")
+                attrs = node.get("attributes")
+                if isinstance(path, str) and isinstance(attrs, dict):
+                    dataset_attrs_by_path[path] = attrs
 
         def _set_hdf_path_for_quantity(qname: str) -> None:
             path_candidate = f"/{qname}"
@@ -479,6 +520,23 @@ def to_nomad(
                 anns = qdef.get("m_annotations", {})
                 anns["hdf5"] = {"path": path_candidate}
                 qdef["m_annotations"] = anns
+
+                # Prefer ontology metadata directly from HDF dataset attributes.
+                attrs = dataset_attrs_by_path.get(path_candidate, {})
+                if isinstance(attrs, dict):
+                    desc_parts: list[str] = []
+                    raw_desc = attrs.get("description")
+                    if isinstance(raw_desc, str) and raw_desc.strip():
+                        desc_parts.append(raw_desc.strip())
+                    raw_label = attrs.get("ontology_label")
+                    if isinstance(raw_label, str) and raw_label.strip():
+                        desc_parts.append(f"ontology: {raw_label.strip()}")
+                    raw_iri = attrs.get("ontology_iri")
+                    if isinstance(raw_iri, str) and raw_iri.strip():
+                        desc_parts.append(f"IRI: {raw_iri.strip()}")
+                    if desc_parts:
+                        qdef["description"] = " | ".join(desc_parts)
+
                 extra_quantities[qname] = qdef
 
         # Build annotations for all collection-derived quantity names
@@ -618,6 +676,16 @@ def to_nomad(
         extra_base_sections=extra_base_sections or None,
         include_entity_values=include_entity_values,
         include_mammos_entities_metadata=include_mammos_entities_metadata,
+        include_mammos_entity_version=include_mammos_entity_version,
+        include_nomad_generation_metadata=include_nomad_generation_metadata,
+        nomad_generation_metadata={
+            "created_datetime_utc": datetime.now(timezone.utc).isoformat(),
+            "source_file": source_path.name if source_path else "",
+            "source_format": source_suffix.lstrip(".") if source_suffix else "",
+            "source_mammos_entity_version": source_mammos_entity_version,
+            "runtime_mammos_entity_version": runtime_mammos_entity_version,
+            "to_nomad_version": _safe_to_nomad_version(),
+        },
         include_ontology_in_yaml=include_ontology_in_yaml,
         **schema_kwargs,
     )

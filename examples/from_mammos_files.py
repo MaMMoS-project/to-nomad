@@ -39,6 +39,7 @@ common_meta = dict(
     owner="Demo User",
     lab_id="DEMO-001",
     description="Converted from MaMMoS file examples.",
+    include_mammos_entity_version=True,
 )
 
 # Convert directly from YAML file path

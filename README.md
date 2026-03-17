@@ -168,6 +168,18 @@ data:
 When `data` is an HDF path, `to_nomad(..., include_hdf_metadata=True)` adds
 `hdf_source_path` and `hdf_metadata_json` to the YAML `data` section.
 
+By default, `to_nomad(...)` now writes a dedicated `nomad_generation`
+subsection with conversion provenance, including:
+- `created_datetime_utc`
+- `source_file` and `source_format`
+- `source_mammos_entity_version` (from input file attrs, when available)
+- `runtime_mammos_entity_version`
+- `to_nomad_version`
+
+Set `include_nomad_generation_metadata=False` to disable this subsection.
+Set `include_mammos_entity_version=False` to omit the older top-level
+`mammos_entity_version` field.
+
 When `data` is a CSV/YAML path, `to_nomad(..., file_reference_mode=True)`
 stores `data_file` and avoids inlining entity values into YAML `data`.
 For CSV, tabular annotations are added so NOMAD reads column data directly from

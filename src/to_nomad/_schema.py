@@ -214,6 +214,8 @@ def generate_archive(
     include_entity_values: bool = True,
     include_mammos_entities_metadata: bool = True,
     include_mammos_entity_version: bool = True,
+    include_nomad_generation_metadata: bool = False,
+    nomad_generation_metadata: dict[str, Any] | None = None,
     include_ontology_in_yaml: bool = True,
 ) -> dict:
     """Generate a NOMAD archive dictionary from mammos-entity data.
@@ -271,6 +273,12 @@ def generate_archive(
         include_mammos_entity_version:
             If ``True`` (default), include ``mammos_entity_version`` quantity
             and value.
+        include_nomad_generation_metadata:
+            If ``True``, include a dedicated ``nomad_generation`` subsection
+            describing how this NOMAD archive was produced.
+        nomad_generation_metadata:
+            Values written to ``data.nomad_generation`` when
+            ``include_nomad_generation_metadata=True``.
         include_ontology_in_yaml:
             If ``True`` (default), include ontology label/IRI in quantity
             descriptions.
@@ -399,32 +407,44 @@ def generate_archive(
             if bs not in base_sections:
                 base_sections.append(bs)
 
+    sub_sections: dict[str, Any] = {}
+    if include_mammos_entities_metadata:
+        sub_sections["mammos_entities"] = {
+            "repeats": True,
+            "section": {
+                "quantities": {
+                    "name": {"type": "str"},
+                    "value_key": {"type": "str"},
+                    "source_type": {"type": "str"},
+                    "ontology_label": {"type": "str"},
+                    "ontology_iri": {"type": "str"},
+                    "unit": {"type": "str"},
+                    "description": {"type": "str"},
+                }
+            },
+        }
+
+    if include_nomad_generation_metadata:
+        sub_sections["nomad_generation"] = {
+            "section": {
+                "quantities": {
+                    "created_datetime_utc": {"type": "Datetime"},
+                    "source_file": {"type": "str"},
+                    "source_format": {"type": "str"},
+                    "source_mammos_entity_version": {"type": "str"},
+                    "runtime_mammos_entity_version": {"type": "str"},
+                    "to_nomad_version": {"type": "str"},
+                }
+            }
+        }
+
     definitions: dict = {
         "name": name,
         "sections": {
             section_name: {
                 "base_sections": base_sections,
                 "quantities": quantities,
-                "sub_sections": (
-                    {
-                        "mammos_entities": {
-                            "repeats": True,
-                            "section": {
-                                "quantities": {
-                                    "name": {"type": "str"},
-                                    "value_key": {"type": "str"},
-                                    "source_type": {"type": "str"},
-                                    "ontology_label": {"type": "str"},
-                                    "ontology_iri": {"type": "str"},
-                                    "unit": {"type": "str"},
-                                    "description": {"type": "str"},
-                                }
-                            },
-                        }
-                    }
-                    if include_mammos_entities_metadata
-                    else {}
-                ),
+                "sub_sections": sub_sections,
             }
         },
     }
@@ -453,6 +473,14 @@ def generate_archive(
         data_block["mammos_entity_version"] = me.__version__
     if include_mammos_entities_metadata:
         data_block["mammos_entities"] = mammos_entity_records
+    if include_nomad_generation_metadata:
+        generation_data = {
+            k: v
+            for k, v in (nomad_generation_metadata or {}).items()
+            if v is not None and v != ""
+        }
+        if generation_data:
+            data_block["nomad_generation"] = generation_data
     if extra_data:
         data_block.update(extra_data)
 
