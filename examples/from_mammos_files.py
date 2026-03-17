@@ -39,7 +39,12 @@ common_meta = dict(
     owner="Demo User",
     lab_id="DEMO-001",
     description="Converted from MaMMoS file examples.",
-    include_mammos_entity_version=True,
+    chemical_formula="Nd2Fe14B",
+    elemental_composition=[
+        {"element": "Nd", "atomic_fraction": 2 / 17},
+        {"element": "Fe", "atomic_fraction": 14 / 17},
+        {"element": "B", "atomic_fraction": 1 / 17},
+    ],
 )
 
 # Convert directly from YAML file path

@@ -22,10 +22,10 @@ Convert [mammos-entity](https://github.com/MaMMoS-project/mammos-entity) data to
 4. **Reads MaMMoS files directly** – you can pass a `.csv`, `.yaml`/`.yml`,
    or `.hdf`/`.h5`/`.hdf5` path directly to `to_nomad.to_nomad(...)`; internally it
    uses the corresponding `mammos-entity` file readers.
-5. **Stores entity provenance explicitly** – each generated archive includes a
-   `mammos_entities` subsection with per-quantity metadata (`name`,
-   `ontology_label`, `ontology_iri`, `unit`, `description`, `source_type`) plus
-   `mammos_entity_version` for traceability and easy retrieval.
+5. **Stores generation provenance explicitly** – each generated archive includes
+  a `nomad_generation` subsection with conversion metadata, and can also
+  include a `mammos_entities` subsection with per-quantity metadata (`name`,
+  `ontology_label`, `ontology_iri`, `unit`, `description`, `source_type`).
 
 ## Installation
 
@@ -66,6 +66,11 @@ path = to_nomad.to_nomad(
     description="Intrinsic properties of a NdFeB bulk sample within MaMMoS.",
     method="VSM",
     chemical_formula="Nd2Fe14B",
+    elemental_composition=[
+      {"element": "Nd", "atomic_fraction": 2 / 17},
+      {"element": "Fe", "atomic_fraction": 14 / 17},
+      {"element": "B", "atomic_fraction": 1 / 17},
+    ],
 )
 
 # Interactive: omit metadata fields and the user will be asked for them
@@ -177,8 +182,12 @@ subsection with conversion provenance, including:
 - `to_nomad_version`
 
 Set `include_nomad_generation_metadata=False` to disable this subsection.
-Set `include_mammos_entity_version=False` to omit the older top-level
-`mammos_entity_version` field.
+Set `include_mammos_entity_version=True` only if you still want the older
+top-level `mammos_entity_version` field in addition to `nomad_generation`.
+
+Optional chemical composition metadata can be provided with:
+- `chemical_formula="Nd2Fe14B"`
+- `elemental_composition=[{"element": "Nd", "atomic_fraction": 0.1176}, ...]`
 
 When `data` is a CSV/YAML path, `to_nomad(..., file_reference_mode=True)`
 stores `data_file` and avoids inlining entity values into YAML `data`.

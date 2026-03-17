@@ -190,6 +190,29 @@ def _mammos_entity_record(name: str, entity_like: Any) -> dict[str, str]:
     return record
 
 
+def _normalize_elemental_composition(
+    elemental_composition: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Normalize elemental composition entries for YAML serialization."""
+    if not elemental_composition:
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for entry in elemental_composition:
+        if not isinstance(entry, dict):
+            continue
+        element = entry.get("element")
+        if not isinstance(element, str) or not element.strip():
+            continue
+        out: dict[str, Any] = {"element": element.strip()}
+        if entry.get("atomic_fraction") is not None:
+            out["atomic_fraction"] = float(entry["atomic_fraction"])
+        if entry.get("mass_fraction") is not None:
+            out["mass_fraction"] = float(entry["mass_fraction"])
+        normalized.append(out)
+    return normalized
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -207,13 +230,14 @@ def generate_archive(
     method: str = "",
     short_name: str = "",
     chemical_formula: str = "",
+    elemental_composition: list[dict[str, Any]] | None = None,
     default_entry_name: str = "MaMMoS Data",
     extra_quantities: dict[str, dict[str, Any]] | None = None,
     extra_data: dict[str, Any] | None = None,
     extra_base_sections: list[str] | None = None,
     include_entity_values: bool = True,
     include_mammos_entities_metadata: bool = True,
-    include_mammos_entity_version: bool = True,
+    include_mammos_entity_version: bool = False,
     include_nomad_generation_metadata: bool = False,
     nomad_generation_metadata: dict[str, Any] | None = None,
     include_ontology_in_yaml: bool = True,
@@ -251,6 +275,10 @@ def generate_archive(
             Chemical formula of the sample (e.g. ``"Nd2Fe14B"``).  When
             provided, ``nomad.datamodel.metainfo.eln.Chemical`` is added as a
             base section so that NOMAD can display the formula properly.
+        elemental_composition:
+            Optional list of elemental composition entries. Each item should
+            contain ``element`` and may also provide ``atomic_fraction`` and
+            ``mass_fraction``.
         default_entry_name:
             Default value for the ``name`` field in the generated NOMAD entry.
         extra_quantities:
@@ -271,8 +299,8 @@ def generate_archive(
             If ``True`` (default), include the ``mammos_entities`` subsection
             and corresponding data records.
         include_mammos_entity_version:
-            If ``True`` (default), include ``mammos_entity_version`` quantity
-            and value.
+            If ``True``, include legacy top-level ``mammos_entity_version``
+            quantity and value.
         include_nomad_generation_metadata:
             If ``True``, include a dedicated ``nomad_generation`` subsection
             describing how this NOMAD archive was produced.
@@ -395,9 +423,11 @@ def generate_archive(
             else:
                 quantities[qname] = qextra
 
-    # Base sections: add Chemical if a formula is given
+    elemental_composition_data = _normalize_elemental_composition(elemental_composition)
+
+    # Base sections: add Chemical if composition metadata is given
     base_sections: list[str] = ["nomad.datamodel.data.EntryData"]
-    if chemical_formula:
+    if chemical_formula or elemental_composition_data:
         base_sections = [
             "nomad.datamodel.metainfo.eln.Chemical",
             "nomad.datamodel.data.EntryData",
@@ -436,6 +466,18 @@ def generate_archive(
                     "to_nomad_version": {"type": "str"},
                 }
             }
+        }
+
+    if elemental_composition_data:
+        sub_sections["elemental_composition"] = {
+            "repeats": True,
+            "section": {
+                "quantities": {
+                    "element": {"type": "str"},
+                    "atomic_fraction": {"type": "np.float64"},
+                    "mass_fraction": {"type": "np.float64"},
+                }
+            },
         }
 
     definitions: dict = {
@@ -481,6 +523,8 @@ def generate_archive(
         }
         if generation_data:
             data_block["nomad_generation"] = generation_data
+    if elemental_composition_data:
+        data_block["elemental_composition"] = elemental_composition_data
     if extra_data:
         data_block.update(extra_data)
 

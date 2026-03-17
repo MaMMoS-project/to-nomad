@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     import mammos_entity
 
 __all__ = [
+    "__version__",
     "to_nomad",
     "save_hdf_and_to_nomad",
     "save_hdf5_and_to_nomad",
@@ -75,6 +76,20 @@ __all__ = [
 
 # Expose sub-modules for power users
 from to_nomad import _schema, _prompt, _io  # noqa: E402, F401
+
+
+def _read_to_nomad_version() -> str:
+    """Return installed to-nomad package version, or empty string."""
+    try:
+        return importlib_metadata.version("to-nomad")
+    except importlib_metadata.PackageNotFoundError:
+        return ""
+    except Exception:
+        return ""
+
+
+# Public package version (e.g. ``to_nomad.__version__``)
+__version__ = _read_to_nomad_version()
 
 
 def _load_mammos_data_from_path(path: str | Path):
@@ -186,13 +201,8 @@ def _infer_mammos_csv_header_row(
 
 
 def _safe_to_nomad_version() -> str:
-    """Return installed to-nomad package version, or empty string."""
-    try:
-        return importlib_metadata.version("to-nomad")
-    except importlib_metadata.PackageNotFoundError:
-        return ""
-    except Exception:
-        return ""
+    """Return the resolved to-nomad version used in this runtime."""
+    return __version__
 
 
 def to_nomad(
@@ -206,8 +216,9 @@ def to_nomad(
     hdf_reference_mode: bool = False,
     file_reference_mode: bool = False,
     hdf_entity_names: list[str] | None = None,
+    elemental_composition: list[dict] | None = None,
     include_mammos_entities_metadata: bool | None = None,
-    include_mammos_entity_version: bool = True,
+    include_mammos_entity_version: bool = False,
     include_nomad_generation_metadata: bool = True,
     include_ontology_in_yaml: bool | None = None,
     **metadata: str,
@@ -280,12 +291,15 @@ def to_nomad(
             Optional list of top-level entity names to include when input is
             HDF. This allows the HDF file to contain more datasets than shown
             in NOMAD. If omitted, all top-level entities are used.
+        elemental_composition:
+            Optional chemical composition entries, e.g.
+            ``[{"element": "Nd", "atomic_fraction": 0.12}]``.
         include_mammos_entities_metadata:
             Controls whether the explicit ``mammos_entities`` subsection is
             included. In ``hdf_reference_mode`` the default is ``False`` to
             avoid duplication with HDF-stored attributes.
         include_mammos_entity_version:
-            If ``True`` (default), include ``mammos_entity_version`` in the
+            If ``True``, include legacy top-level ``mammos_entity_version`` in the
             schema quantities and data block.
         include_nomad_generation_metadata:
             If ``True`` (default), include ``nomad_generation`` subsection with
@@ -435,9 +449,11 @@ def to_nomad(
             "method",
             "short_name",
             "chemical_formula",
+            "elemental_composition",
             "default_entry_name",
         )
     }
+    schema_kwargs["elemental_composition"] = elemental_composition
     # Pass section_name only if explicitly provided (not empty), so that
     # generate_archive derives it from 'name' automatically.
     if metadata.get("section_name"):
