@@ -1,8 +1,12 @@
 # to-nomad
 
-Convert [mammos-entity](https://github.com/MaMMoS-project/mammos-entity) data to
-[NOMAD](https://nomad-lab.eu/)-compatible upload archives.
-See also https://arxiv.org/abs/2609.11464 .
+This repository provides a working demonstrator (March 2026) showing how data represented with [mammos-entity](https://github.com/MaMMoS-project/mammos-entity) can be transformed into [NOMAD](https://nomad-lab.eu/)-compatible upload archives . It was developed primarily as a reference implementation and demonstration of how the mammos-entity data model can be used to generate well-documented NOMAD uploads enriched with ontology-based metadata and semantic labels.
+
+The code is intended to illustrate the workflow and concepts presented in the MaMMoS project, while also serving as a functional example that users can adapt and extend for their own applications.
+
+See the mammos-entity documentation and examples: https://mammos-project.github.io/mammos/examples/mammos-entity/index.html
+
+For further information on the ontology and its use-case with mammos-entity see also https://arxiv.org/abs/2609.11464 .
 
 ## Overview
 
