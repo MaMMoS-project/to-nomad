@@ -2,6 +2,7 @@
 
 Convert [mammos-entity](https://github.com/MaMMoS-project/mammos-entity) data to
 [NOMAD](https://nomad-lab.eu/)-compatible upload archives.
+See also https://arxiv.org/abs/2609.11464 .
 
 ## Overview
 
