@@ -70,9 +70,16 @@ def _normalize_unit_for_nomad(unit_str: str) -> str:
 
     Astropy may render powers as implicit suffixes (e.g. ``m3`` or ``m-2``),
     while Pint in NOMAD expects explicit exponents (e.g. ``m^3`` or ``m^-2``).
+    
+    Known issues:
+    - Some ontology-defined units may have incorrect casing (e.g., "Angstrom" -> "angstrom")
     """
+    # Fix known casing issues from ontologies
+    # Angstrom should be lowercase for Pint compatibility
+    normalized = unit_str.replace("Angstrom", "angstrom")
+    
     # Convert tokens like `m3`, `cm-2`, `s+1` to `m^3`, `cm^-2`, `s^1`.
-    normalized = re.sub(r"\b([A-Za-z]+)([+-]?\d+)\b", r"\1^\2", unit_str)
+    normalized = re.sub(r"\b([A-Za-z]+)([+-]?\d+)\b", r"\1^\2", normalized)
     # Keep a single consistent spacing around division signs.
     normalized = re.sub(r"\s*/\s*", " / ", normalized)
     return normalized.strip()
@@ -377,30 +384,13 @@ def generate_archive(
         }
 
     mammos_entity_records: list[dict[str, str]] = []
+    nested_collections: dict[str, mammos_entity.EntityCollection] = {}
 
     for ename, entity_like in col:
         if isinstance(entity_like, me.EntityCollection):
-            # Nested collections cannot be represented as a flat quantity.
-            # Flatten one level deep by prefixing the key.
-            for sub_name, sub_entity in entity_like:
-                if isinstance(sub_entity, me.EntityCollection):
-                    import warnings  # noqa: PLC0415
-
-                    warnings.warn(
-                        f"Nested EntityCollection '{ename}.{sub_name}' is more "
-                        "than one level deep and will be skipped.",
-                        stacklevel=2,
-                    )
-                    continue
-                flat_key = f"{ename}__{sub_name}"
-                quantities[flat_key] = _quantity_def(
-                    flat_key,
-                    sub_entity,
-                    include_ontology_context=include_ontology_in_yaml,
-                )
-                mammos_entity_records.append(
-                    _mammos_entity_record(flat_key, sub_entity)
-                )
+            # Store nested collections for sub-section processing later
+            nested_collections[ename] = entity_like
+            continue
         else:
             quantities[ename] = _quantity_def(
                 ename,
@@ -480,6 +470,52 @@ def generate_archive(
             },
         }
 
+    # Process nested EntityCollections as sub-sections
+    # This supports arbitrary nesting depth via recursive sub-sections
+    def _build_sub_section(
+        sub_col: mammos_entity.EntityCollection,
+        parent_path: str = "",
+    ) -> dict[str, Any] | None:
+        """Recursively build a sub-section dict from a nested EntityCollection."""
+        sub_section_quantities: dict[str, dict] = {}
+        sub_sub_sections: dict[str, Any] = {}
+        
+        for name, entity in sub_col:
+            if isinstance(entity, me.EntityCollection):
+                # Recursively process nested collections as sub-sub-sections
+                nested_result = _build_sub_section(entity, f"{parent_path}.{name}" if parent_path else name)
+                if nested_result:
+                    sub_sub_sections[name] = nested_result
+            else:
+                # Add regular entity to quantities
+                sub_section_quantities[name] = _quantity_def(
+                    name,
+                    entity,
+                    include_ontology_context=include_ontology_in_yaml,
+                )
+                # Track in mammos_entity_records with qualified name
+                qualified_name = f"{parent_path}.{name}" if parent_path else name
+                mammos_entity_records.append(
+                    _mammos_entity_record(qualified_name, entity)
+                )
+        
+        # Only create sub-section if it has quantities or sub-sections
+        if sub_section_quantities or sub_sub_sections:
+            result: dict[str, Any] = {
+                "section": {
+                    "quantities": sub_section_quantities,
+                }
+            }
+            if sub_sub_sections:
+                result["section"]["sub_sections"] = sub_sub_sections
+            return result
+        return None
+    
+    for sub_section_name, sub_col in nested_collections.items():
+        sub_section_def = _build_sub_section(sub_col, sub_section_name)
+        if sub_section_def:
+            sub_sections[sub_section_name] = sub_section_def
+
     definitions: dict = {
         "name": name,
         "sections": {
@@ -530,16 +566,32 @@ def generate_archive(
 
     # Entity values (optional; can be omitted in reference-based workflows)
     if include_entity_values:
+        # First, add regular (non-nested) entity values
         for ename, entity_like in col:
             if isinstance(entity_like, me.EntityCollection):
-                for sub_name, sub_entity in entity_like:
-                    if isinstance(sub_entity, me.EntityCollection):
-                        continue
-                    flat_key = f"{ename}__{sub_name}"
-                    val = getattr(sub_entity, "value", sub_entity)
-                    data_block[flat_key] = _to_serializable(val)
-            else:
-                val = getattr(entity_like, "value", entity_like)
-                data_block[ename] = _to_serializable(val)
+                continue  # Skip nested collections; processed below
+            val = getattr(entity_like, "value", entity_like)
+            data_block[ename] = _to_serializable(val)
+        
+        # Then, add nested collection values as nested dictionaries (recursively)
+        def _build_nested_data(sub_col: mammos_entity.EntityCollection) -> dict[str, Any]:
+            """Recursively build nested data dict from a nested EntityCollection."""
+            result: dict[str, Any] = {}
+            for name, entity in sub_col:
+                if isinstance(entity, me.EntityCollection):
+                    # Recursively process nested collections
+                    nested_data = _build_nested_data(entity)
+                    if nested_data:
+                        result[name] = nested_data
+                else:
+                    # Add regular entity value
+                    val = getattr(entity, "value", entity)
+                    result[name] = _to_serializable(val)
+            return result
+        
+        for sub_section_name, sub_col in nested_collections.items():
+            sub_data = _build_nested_data(sub_col)
+            if sub_data:
+                data_block[sub_section_name] = sub_data
 
     return {"definitions": definitions, "data": data_block}

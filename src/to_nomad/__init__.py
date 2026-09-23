@@ -562,7 +562,7 @@ def to_nomad(
                     for sub_name, sub_entity in entity_like:
                         if isinstance(sub_entity, me.EntityCollection):
                             continue
-                        _set_hdf_path_for_quantity(f"{ename}__{sub_name}")
+                        _set_hdf_path_for_quantity(f"{ename}.{sub_name}")
                 else:
                     _set_hdf_path_for_quantity(ename)
         elif isinstance(data, me.Entity):
@@ -595,7 +595,7 @@ def to_nomad(
                         for sub_name, sub_entity in entity_like:
                             if isinstance(sub_entity, me.EntityCollection):
                                 continue
-                            quantity_names.append(f"{ename}__{sub_name}")
+                            quantity_names.append(f"{ename}.{sub_name}")
                     else:
                         quantity_names.append(ename)
             elif isinstance(data, me.Entity):
