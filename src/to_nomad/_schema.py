@@ -134,7 +134,7 @@ def _quantity_def(
         if include_ontology_context and entity_like.ontology_label:
             desc_parts.append(f"ontology: {entity_like.ontology_label}")
         if include_ontology_context and entity_like.ontology_iri:
-            desc_parts.append(f"IRI: {entity_like.ontology_iri}")
+            desc_parts.append(f"IRI: [{entity_like.ontology_iri}]({entity_like.ontology_iri})")
         if desc_parts:
             q["description"] = " | ".join(desc_parts)
 
