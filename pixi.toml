@@ -3,7 +3,7 @@ authors = ["HoWilgh <wilfried.hortschitz@donau-uni.ac.at>"]
 channels = ["conda-forge"]
 name = "to-nomad"
 platforms = ["linux-64"]
-version = "0.1.0"
+version = "0.1.1"
 
 [tasks]
 # Install the local package in editable mode so that `import to_nomad` works.
