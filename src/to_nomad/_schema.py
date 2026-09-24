@@ -248,6 +248,7 @@ def generate_archive(
     include_nomad_generation_metadata: bool = False,
     nomad_generation_metadata: dict[str, Any] | None = None,
     include_ontology_in_yaml: bool = True,
+    map_collection_with_ontology: bool = False,
 ) -> dict:
     """Generate a NOMAD archive dictionary from mammos-entity data.
 
@@ -317,6 +318,11 @@ def generate_archive(
         include_ontology_in_yaml:
             If ``True`` (default), include ontology label/IRI in quantity
             descriptions.
+        map_collection_with_ontology:
+            If ``True``, EntityCollections with descriptions matching ontology
+            labels will automatically have an ``ontology_reference`` Entity added
+            with value 1. When enabled, warnings are emitted for descriptions that
+            do not match any ontology label. Default is ``False``.
 
     Returns:
         A nested dictionary ready for YAML serialization in NOMAD archive
@@ -386,10 +392,58 @@ def generate_archive(
     mammos_entity_records: list[dict[str, str]] = []
     nested_collections: dict[str, mammos_entity.EntityCollection] = {}
 
+    def _add_ontology_reference_to_collection(
+        sub_col: mammos_entity.EntityCollection,
+    ) -> mammos_entity.EntityCollection:
+        """Add ontology_reference to collection if description matches ontology label.
+        
+        Recursively processes nested EntityCollections.
+        """
+        import warnings
+        
+        if not map_collection_with_ontology:
+            return sub_col
+        
+        # Create new collection (may need to add ontology_reference)
+        new_col = me.EntityCollection(description=sub_col.description)
+        
+        # Check if this collection's description matches an ontology label
+        if sub_col.description:
+            try:
+                matches = me.search_labels(sub_col.description, auto_wildcard=False)
+                if matches:
+                    # Add ontology_reference as first item
+                    new_col.ontology_reference = me.Entity(sub_col.description, 1, None)
+                else:
+                    warnings.warn(
+                        f"EntityCollection description '{sub_col.description}' does not "
+                        f"match any ontology label (auto_wildcard=False)",
+                        UserWarning,
+                        stacklevel=5,
+                    )
+            except Exception:
+                warnings.warn(
+                    f"Failed to check ontology label for EntityCollection "
+                    f"description '{sub_col.description}'",
+                    UserWarning,
+                    stacklevel=5,
+                )
+        
+        # Copy all items from original collection, recursively processing nested ones
+        for name, entity in sub_col:
+            if isinstance(entity, me.EntityCollection):
+                # Recursively process nested collections
+                setattr(new_col, name, _add_ontology_reference_to_collection(entity))
+            else:
+                setattr(new_col, name, entity)
+        
+        return new_col
+
     for ename, entity_like in col:
         if isinstance(entity_like, me.EntityCollection):
             # Store nested collections for sub-section processing later
-            nested_collections[ename] = entity_like
+            # Apply ontology reference mapping if enabled
+            nested_collections[ename] = _add_ontology_reference_to_collection(entity_like)
             continue
         else:
             quantities[ename] = _quantity_def(

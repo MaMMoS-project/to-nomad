@@ -221,6 +221,7 @@ def to_nomad(
     include_mammos_entity_version: bool = False,
     include_nomad_generation_metadata: bool = True,
     include_ontology_in_yaml: bool | None = None,
+    map_collection_with_ontology: bool = False,
     **metadata: str,
 ) -> Path:
     """Convert mammos-entity data to a NOMAD-compatible ``.archive.yaml`` file.
@@ -308,6 +309,11 @@ def to_nomad(
         include_ontology_in_yaml:
             Controls whether ontology label/IRI are repeated in quantity
             descriptions. In ``hdf_reference_mode`` the default is ``False``.
+        map_collection_with_ontology:
+            If ``True``, EntityCollections with descriptions matching ontology
+            labels will automatically have an ``ontology_reference`` Entity added
+            with value 1. When enabled, warnings are emitted for descriptions that
+            do not match any ontology label. Default is ``False``.
 
         **metadata:
             Pre-filled metadata fields.  All keyword arguments are passed
@@ -703,6 +709,7 @@ def to_nomad(
             "to_nomad_version": _safe_to_nomad_version(),
         },
         include_ontology_in_yaml=include_ontology_in_yaml,
+        map_collection_with_ontology=map_collection_with_ontology,
         **schema_kwargs,
     )
 
