@@ -40,6 +40,16 @@ def _section_name_from(name: str) -> str:
     return s or "MaMMoSData"
 
 
+def _nomad_quantity_name(name: str) -> str:
+    """Derive a valid NOMAD identifier from an arbitrary entity or column name."""
+    s = name.replace("%", "_pct_").replace("/", "_per_").replace("^", "_")
+    s = re.sub(r"[^a-zA-Z0-9_]", "_", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    if s and s[0].isdigit():
+        s = "_" + s
+    return s or "quantity"
+
+
 def _nomad_type(value: Any) -> str:
     """Return the NOMAD type string for a scalar-or-array value."""
     try:
@@ -65,19 +75,29 @@ def _unit_str(entity_like: Any) -> str | None:
     return s if s else None
 
 
+_ASTROPY_TO_PINT_MAP: dict[str, str] = {
+    "deg_C": "degC",
+    "deg_F": "degF",
+    "deg_R": "degR",
+    "Angstrom": "angstrom",
+    "micron": "micrometer",
+    "amu": "unified_atomic_mass_unit",
+    "pct": "%",
+}
+
+
 def _normalize_unit_for_nomad(unit_str: str) -> str:
     """Convert Astropy-style unit strings to NOMAD/Pint compatible notation.
 
     Astropy may render powers as implicit suffixes (e.g. ``m3`` or ``m-2``),
     while Pint in NOMAD expects explicit exponents (e.g. ``m^3`` or ``m^-2``).
-    
-    Known issues:
-    - Some ontology-defined units may have incorrect casing (e.g., "Angstrom" -> "angstrom")
     """
-    # Fix known casing issues from ontologies
-    # Angstrom should be lowercase for Pint compatibility
-    normalized = unit_str.replace("Angstrom", "angstrom")
-    
+    normalized = unit_str.strip()
+
+    # Map known Astropy-specific token differences to Pint
+    for astropy_u, pint_u in _ASTROPY_TO_PINT_MAP.items():
+        normalized = re.sub(rf"\b{re.escape(astropy_u)}\b", pint_u, normalized)
+
     # Convert tokens like `m3`, `cm-2`, `s+1` to `m^3`, `cm^-2`, `s^1`.
     normalized = re.sub(r"\b([A-Za-z]+)([+-]?\d+)\b", r"\1^\2", normalized)
     # Keep a single consistent spacing around division signs.
@@ -172,13 +192,17 @@ def _quantity_def(
     return q
 
 
-def _mammos_entity_record(name: str, entity_like: Any) -> dict[str, str]:
+def _mammos_entity_record(
+    name: str,
+    entity_like: Any,
+    value_key: str | None = None,
+) -> dict[str, str]:
     """Build retrieval-focused metadata for one entry from the source collection."""
     import mammos_entity as me  # noqa: PLC0415
 
     record: dict[str, str] = {
         "name": name,
-        "value_key": name,
+        "value_key": value_key if value_key is not None else name,
         "source_type": type(entity_like).__name__,
         "ontology_label": "",
         "ontology_iri": "",
@@ -446,12 +470,13 @@ def generate_archive(
             nested_collections[ename] = _add_ontology_reference_to_collection(entity_like)
             continue
         else:
-            quantities[ename] = _quantity_def(
-                ename,
+            qname = _nomad_quantity_name(ename)
+            quantities[qname] = _quantity_def(
+                qname,
                 entity_like,
                 include_ontology_context=include_ontology_in_yaml,
             )
-            mammos_entity_records.append(_mammos_entity_record(ename, entity_like))
+            mammos_entity_records.append(_mammos_entity_record(ename, entity_like, value_key=qname))
 
     if extra_quantities:
         for qname, qextra in extra_quantities.items():
@@ -542,15 +567,16 @@ def generate_archive(
                     sub_sub_sections[name] = nested_result
             else:
                 # Add regular entity to quantities
-                sub_section_quantities[name] = _quantity_def(
-                    name,
+                qname = _nomad_quantity_name(name)
+                sub_section_quantities[qname] = _quantity_def(
+                    qname,
                     entity,
                     include_ontology_context=include_ontology_in_yaml,
                 )
                 # Track in mammos_entity_records with qualified name
                 qualified_name = f"{parent_path}.{name}" if parent_path else name
                 mammos_entity_records.append(
-                    _mammos_entity_record(qualified_name, entity)
+                    _mammos_entity_record(qualified_name, entity, value_key=qname)
                 )
         
         # Only create sub-section if it has quantities or sub-sections
@@ -624,8 +650,9 @@ def generate_archive(
         for ename, entity_like in col:
             if isinstance(entity_like, me.EntityCollection):
                 continue  # Skip nested collections; processed below
+            qname = _nomad_quantity_name(ename)
             val = getattr(entity_like, "value", entity_like)
-            data_block[ename] = _to_serializable(val)
+            data_block[qname] = _to_serializable(val)
         
         # Then, add nested collection values as nested dictionaries (recursively)
         def _build_nested_data(sub_col: mammos_entity.EntityCollection) -> dict[str, Any]:
@@ -639,8 +666,9 @@ def generate_archive(
                         result[name] = nested_data
                 else:
                     # Add regular entity value
+                    qname = _nomad_quantity_name(name)
                     val = getattr(entity, "value", entity)
-                    result[name] = _to_serializable(val)
+                    result[qname] = _to_serializable(val)
             return result
         
         for sub_section_name, sub_col in nested_collections.items():

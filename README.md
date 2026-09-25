@@ -164,6 +164,27 @@ data:
   …
 ```
 
+## Name and Unit Normalization (MaMMoS / Astropy → NOMAD / Pint)
+
+NOMAD uses strict Metainfo validation and Pint-based unit parsing. `to-nomad` automatically handles identifier sanitization and unit translation to guarantee upload compatibility:
+
+### 1. Identifier Sanitization (NOMAD Metainfo Compatibility)
+NOMAD Metainfo requires section and quantity definition keys to be valid Python identifiers matching `^[a-zA-Z_][a-zA-Z0-9_]*$`. When transforming arbitrary collection keys or column headers (e.g. from experimental CSV/HDF datasets), `to-nomad` automatically normalizes names:
+- `/` is translated to `_per_` (e.g. `Hc_A/m_gb1nm` → `Hc_A_per_m_gb1nm`, `A_J/m` → `A_J_per_m`)
+- `%` is translated to `_pct_` (e.g. `Rwp_%ESRF` → `Rwp_pct_ESRF`)
+- `.`, `^`, `-`, spaces, and special symbols are replaced by `_` (e.g. `Js_gb_0.05` → `Js_gb_0_05`, `K_1_J/m^3` → `K_1_J_per_m_3`)
+- Leading digits are prefixed with `_`
+- Consecutive underscores are collapsed and trimmed
+
+> **Traceability**: The original entity/column name is always preserved in the `mammos_entities` metadata section under `name`, with `value_key` pointing to the sanitized schema identifier in `data` and `definitions`.
+
+### 2. Unit Translation (Astropy Units → Pint / NOMAD)
+`mammos-entity` utilizes Astropy Units (`astropy.units`), whereas NOMAD uses Pint (`pint`) for unit definition and validation. `to-nomad` bridges the syntax differences automatically:
+- **Temperature aliases**: Astropy's `deg_C`, `deg_F`, `deg_R` are mapped to Pint's `degC`, `degF`, `degR`.
+- **Implicit exponents**: Exponents without carets (e.g. `m3`, `cm-2`, `s+1`, `Am2/kg`) are converted to explicit exponents (e.g. `m^3`, `cm^-2`, `s^1`, `A m^2 / kg`).
+- **Casing & Symbol mapping**: `Angstrom` → `angstrom`, `micron` → `micrometer`, `amu` → `unified_atomic_mass_unit`.
+- **Division spacing**: Normalized to consistent ` / ` syntax (e.g. `J / (kg * K)`).
+
 ## API
 
 | Function / class | Description |
