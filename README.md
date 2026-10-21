@@ -185,6 +185,47 @@ NOMAD Metainfo requires section and quantity definition keys to be valid Python 
 - **Casing & Symbol mapping**: `Angstrom` → `angstrom`, `micron` → `micrometer`, `amu` → `unified_atomic_mass_unit`.
 - **Division spacing**: Normalized to consistent ` / ` syntax (e.g. `J / (kg * K)`).
 
+### 3. CSV Column Naming for HDF5 Reference Mode
+When using `hdf_reference_mode=True`, column names from CSV files are used as HDF5 dataset names.
+Column names containing certain characters (notably `/`) create nested HDF5 group structures that are
+incompatible with NOMAD's HDF5Normalizer. To prevent this:
+
+**Prevent nested groups by avoiding `/` in CSV column names.** The characters `/`, `%`, `.`, `^`, `-`,
+spaces, and other special symbols are automatically sanitized in the generated NOMAD archive,
+but this sanitization happens *after* the HDF5 file is created, causing a mismatch between
+HDF5 dataset paths and quantity names.
+
+**Recommended practice for CSV files:**
+- Use only letters, digits, and underscores in column names
+- Replace `/` with `_per_` (e.g., `A_J/m` → `A_J_per_m`)
+- Replace `%` with `_pct_` (e.g., `Rwp_%` → `Rwp_pct_`)
+- Replace other special characters with `_`
+- Prefix leading digits with `_`
+
+**Sanitization is optional:** If your CSV column names already follow these rules,
+sanitization is not needed. The `prepare_csv_for_nomad()` function and its CLI script
+provide an optional `--no-sanitize` flag to copy CSV files without modification.
+
+**Helper script:** The `prepare_csv_for_nomad` function is available in the to-nomad package:
+
+```python
+from to_nomad import prepare_csv_for_nomad
+prepare_csv_for_nomad("input.csv", "output.csv")  # With sanitization (default)
+prepare_csv_for_nomad("input.csv", "output.csv", sanitize=False)  # Without sanitization
+```
+
+Or via CLI:
+```bash
+# With sanitization (default):
+python -m to_nomad.prepare_csv_for_nomad input.csv output.csv
+
+# Without sanitization:
+python -m to_nomad.prepare_csv_for_nomad input.csv output.csv --no-sanitize
+```
+
+Note: For simple cases, you can also load the CSV with `mammos_entity.from_csv()`,
+then use entity names directly (programmatic entities don't have special characters).
+
 ## API
 
 | Function / class | Description |
