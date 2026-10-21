@@ -59,6 +59,7 @@ from typing import TYPE_CHECKING
 from to_nomad._io import create_upload_zip, save_archive_yaml
 from to_nomad._prompt import collect_metadata
 from to_nomad._schema import generate_archive
+from to_nomad.prepare_csv_for_nomad import prepare_csv_for_nomad
 
 if TYPE_CHECKING:
     import mammos_entity
@@ -72,6 +73,7 @@ __all__ = [
     "save_archive_yaml",
     "create_upload_zip",
     "collect_metadata",
+    "prepare_csv_for_nomad",
 ]
 
 # Expose sub-modules for power users
@@ -465,6 +467,7 @@ def to_nomad(
     if metadata.get("section_name"):
         schema_kwargs["section_name"] = metadata["section_name"]
     extra_quantities: dict[str, dict] = {}
+    hdf_quantity_annotations: dict[str, dict] = {}
     extra_data: dict[str, str] = {}
     extra_base_sections: list[str] = []
     include_entity_values = True
@@ -533,46 +536,78 @@ def to_nomad(
                 if isinstance(path, str) and isinstance(attrs, dict):
                     dataset_attrs_by_path[path] = attrs
 
-        def _set_hdf_path_for_quantity(qname: str) -> None:
-            path_candidate = f"/{qname}"
-            if path_candidate in dataset_paths:
-                qdef = extra_quantities.get(qname)
-                if qdef is None:
-                    qdef = {}
-                anns = qdef.get("m_annotations", {})
-                anns["hdf5"] = {"path": path_candidate}
-                qdef["m_annotations"] = anns
+        def _set_hdf_path_for_quantity(qualified_name: str, hdf_path: str) -> None:
+            """Attach an ``m_annotations.hdf5.path`` entry for a quantity.
 
-                # Prefer ontology metadata directly from HDF dataset attributes.
-                attrs = dataset_attrs_by_path.get(path_candidate, {})
-                if isinstance(attrs, dict):
-                    desc_parts: list[str] = []
-                    raw_desc = attrs.get("description")
-                    if isinstance(raw_desc, str) and raw_desc.strip():
-                        desc_parts.append(raw_desc.strip())
-                    raw_label = attrs.get("ontology_label")
-                    if isinstance(raw_label, str) and raw_label.strip():
-                        desc_parts.append(f"ontology: {raw_label.strip()}")
-                    raw_iri = attrs.get("ontology_iri")
-                    if isinstance(raw_iri, str) and raw_iri.strip():
-                        desc_parts.append(f"IRI: {raw_iri.strip()}")
-                    if desc_parts:
-                        qdef["description"] = " | ".join(desc_parts)
+            Args:
+                qualified_name: Dotted schema location of the quantity (e.g.
+                    ``material.unit_cell.cell_volume``); a name without a dot
+                    addresses a top-level quantity.
+                hdf_path: Absolute path of the dataset inside the HDF file
+                    (e.g. ``/material/unit_cell/cell_volume``).
+            """
+            if hdf_path not in dataset_paths:
+                return
+            qextra: dict = {"m_annotations": {"hdf5": {"path": hdf_path}}}
 
-                extra_quantities[qname] = qdef
+            # Prefer ontology metadata directly from HDF dataset attributes.
+            attrs = dataset_attrs_by_path.get(hdf_path, {})
+            if isinstance(attrs, dict):
+                desc_parts: list[str] = []
+                raw_desc = attrs.get("description")
+                if isinstance(raw_desc, str) and raw_desc.strip():
+                    desc_parts.append(raw_desc.strip())
+                raw_label = attrs.get("ontology_label")
+                if isinstance(raw_label, str) and raw_label.strip():
+                    desc_parts.append(f"ontology: {raw_label.strip()}")
+                raw_iri = attrs.get("ontology_iri")
+                if isinstance(raw_iri, str) and raw_iri.strip():
+                    desc_parts.append(f"IRI: {raw_iri.strip()}")
+                if desc_parts:
+                    qextra["description"] = " | ".join(desc_parts)
 
-        # Build annotations for all collection-derived quantity names
-        if isinstance(data, me.EntityCollection):
-            for ename, entity_like in data:
+            if "." in qualified_name:
+                # Nested quantity: merged into the sub-section tree later.
+                hdf_quantity_annotations[qualified_name] = qextra
+                return
+
+            qdef = extra_quantities.get(qualified_name)
+            if qdef is None:
+                qdef = {}
+            anns = qdef.get("m_annotations", {})
+            anns.update(qextra["m_annotations"])
+            qdef["m_annotations"] = anns
+            if "description" in qextra:
+                qdef["description"] = qextra["description"]
+            extra_quantities[qualified_name] = qdef
+
+        def _walk_collection_for_hdf_paths(
+            coll: me.EntityCollection,
+            prefix: str = "",
+            hdf_prefix: str = "",
+        ) -> None:
+            """Recursively map every entity of a collection to its HDF path."""
+            for name, entity_like in coll:
+                qualified_name = f"{prefix}.{name}" if prefix else name
                 if isinstance(entity_like, me.EntityCollection):
-                    for sub_name, sub_entity in entity_like:
-                        if isinstance(sub_entity, me.EntityCollection):
-                            continue
-                        _set_hdf_path_for_quantity(f"{ename}.{sub_name}")
+                    _walk_collection_for_hdf_paths(
+                        entity_like,
+                        prefix=qualified_name,
+                        hdf_prefix=f"{hdf_prefix}/{name}",
+                    )
                 else:
-                    _set_hdf_path_for_quantity(ename)
+                    _set_hdf_path_for_quantity(
+                        qualified_name, f"{hdf_prefix}/{name}"
+                    )
+
+        # Build annotations for all collection-derived quantity names,
+        # including arbitrarily nested sub-collections.
+        if isinstance(data, me.EntityCollection):
+            _walk_collection_for_hdf_paths(data)
         elif isinstance(data, me.Entity):
-            _set_hdf_path_for_quantity(data.ontology_label)
+            _set_hdf_path_for_quantity(
+                data.ontology_label, f"/{data.ontology_label}"
+            )
 
     if (
         file_reference_mode
@@ -694,6 +729,7 @@ def to_nomad(
     archive = generate_archive(
         data,
         extra_quantities=extra_quantities or None,
+        hdf_quantity_annotations=hdf_quantity_annotations or None,
         extra_data=extra_data or None,
         extra_base_sections=extra_base_sections or None,
         include_entity_values=include_entity_values,

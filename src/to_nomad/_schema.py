@@ -54,6 +54,8 @@ def _nomad_type(value: Any) -> str:
     """Return the NOMAD type string for a scalar-or-array value."""
     try:
         arr = np.asanyarray(value)
+        if arr.dtype == np.bool_:
+            return "bool"
         if np.issubdtype(arr.dtype, np.integer):
             return "int"
         if np.issubdtype(arr.dtype, np.floating) or np.issubdtype(
@@ -94,12 +96,15 @@ def _normalize_unit_for_nomad(unit_str: str) -> str:
     """
     normalized = unit_str.strip()
 
+    # Convert tokens like `m3`, `cm-2`, `s+1` to `m^3`, `cm^-2`, `s^1` first
+    # so trailing digits don't block word-boundary matching on unit names (e.g. Angstrom3).
+    normalized = re.sub(r"\b([A-Za-z]+)([+-]?\d+)\b", r"\1^\2", normalized)
+
     # Map known Astropy-specific token differences to Pint
     for astropy_u, pint_u in _ASTROPY_TO_PINT_MAP.items():
-        normalized = re.sub(rf"\b{re.escape(astropy_u)}\b", pint_u, normalized)
+        flags = re.IGNORECASE if astropy_u.lower() == "angstrom" else 0
+        normalized = re.sub(rf"\b{re.escape(astropy_u)}\b", pint_u, normalized, flags=flags)
 
-    # Convert tokens like `m3`, `cm-2`, `s+1` to `m^3`, `cm^-2`, `s^1`.
-    normalized = re.sub(r"\b([A-Za-z]+)([+-]?\d+)\b", r"\1^\2", normalized)
     # Keep a single consistent spacing around division signs.
     normalized = re.sub(r"\s*/\s*", " / ", normalized)
     return normalized.strip()
@@ -249,6 +254,45 @@ def _normalize_elemental_composition(
 # ---------------------------------------------------------------------------
 
 
+def _apply_hdf_quantity_annotations(
+    section_def: dict[str, Any],
+    annotations: dict[str, dict[str, Any]],
+) -> None:
+    """Merge ``m_annotations.hdf5`` entries into (nested) quantity definitions.
+
+    Args:
+        section_def: Section definition whose quantities may be nested inside
+            ``sub_sections``.
+        annotations: Mapping from dotted quantity location (for example
+            ``material.unit_cell.cell_volume``) to quantity-definition
+            overrides containing ``m_annotations``. Path segments address
+            sub-sections; the final segment addresses a quantity.
+    """
+    for qualified_name, qextra in annotations.items():
+        parts = qualified_name.split(".")
+        target: dict[str, Any] = section_def
+        for part in parts[:-1]:
+            sub_section = target.get("sub_sections", {}).get(part)
+            if not isinstance(sub_section, dict) or "section" not in sub_section:
+                target = {}
+                break
+            target = sub_section["section"]
+        if not target:
+            continue
+        qname = _nomad_quantity_name(parts[-1])
+        section_quantities = target.get("quantities", {})
+        if qname not in section_quantities:
+            continue
+        merged = dict(section_quantities[qname])
+        existing_annotations = dict(merged.get("m_annotations", {}))
+        existing_annotations.update(qextra.get("m_annotations", {}))
+        merged["m_annotations"] = existing_annotations
+        for key, value in qextra.items():
+            if key != "m_annotations":
+                merged[key] = value
+        section_quantities[qname] = merged
+
+
 def generate_archive(
     data: mammos_entity.EntityCollection | mammos_entity.Entity,
     *,
@@ -264,6 +308,7 @@ def generate_archive(
     elemental_composition: list[dict[str, Any]] | None = None,
     default_entry_name: str = "MaMMoS Data",
     extra_quantities: dict[str, dict[str, Any]] | None = None,
+    hdf_quantity_annotations: dict[str, dict[str, Any]] | None = None,
     extra_data: dict[str, Any] | None = None,
     extra_base_sections: list[str] | None = None,
     include_entity_values: bool = True,
@@ -317,6 +362,11 @@ def generate_archive(
             Optional additional quantity definitions to append to the generated
             section quantities. Keys are quantity names, values are quantity
             definition dictionaries (NOMAD schema format).
+        hdf_quantity_annotations:
+            Optional ``m_annotations.hdf5.path`` overrides for quantities,
+            including ones nested inside sub-sections. Keys are dotted
+            quantity locations (e.g. ``material.unit_cell.cell_volume``),
+            values are quantity-definition override dictionaries.
         extra_data:
             Optional additional key/value pairs to append to the ``data``
             section.
@@ -607,6 +657,11 @@ def generate_archive(
         },
     }
 
+    if hdf_quantity_annotations:
+        _apply_hdf_quantity_annotations(
+            definitions["sections"][section_name], hdf_quantity_annotations
+        )
+
     # ------------------------------------------------------------------
     # Build the data block.
     # ------------------------------------------------------------------
@@ -675,5 +730,27 @@ def generate_archive(
             sub_data = _build_nested_data(sub_col)
             if sub_data:
                 data_block[sub_section_name] = sub_data
+    else:
+        # Reference-based workflow: entity values are read from the HDF file
+        # via m_annotations.hdf5.path. Sub-section instances are still written
+        # so NOMAD renders the sections and can fill the annotated quantities;
+        # plain (non-entity) values remain inline.
+
+        def _build_skeleton(sub_col: mammos_entity.EntityCollection) -> dict[str, Any]:
+            """Recursively build a sub-section instance without entity values."""
+            result: dict[str, Any] = {}
+            for name, entity in sub_col:
+                if isinstance(entity, me.EntityCollection):
+                    result[name] = _build_skeleton(entity)
+                elif isinstance(entity, me.Entity):
+                    continue  # value comes from the HDF file
+                else:
+                    result[_nomad_quantity_name(name)] = _to_serializable(
+                        getattr(entity, "value", entity)
+                    )
+            return result
+
+        for sub_section_name, sub_col in nested_collections.items():
+            data_block[sub_section_name] = _build_skeleton(sub_col)
 
     return {"definitions": definitions, "data": data_block}
