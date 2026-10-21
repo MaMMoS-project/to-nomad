@@ -42,6 +42,15 @@ This package deals with two distinct YAML formats — do not confuse them:
 | Role | Upload artifact for NOMAD: `definitions` (schema) + `data` (entry values). Uploaded in parallel to the raw data files, but can hold values inline. | MaMMoS *data file* written by `EntityCollection.to_yaml` and read with `mammos_entity.from_yaml`. An **input** to `to-nomad`, never a NOMAD artifact. |
 | Created by | `to_nomad.to_nomad(...)` | `mammos_entity` itself |
 
+**NOMAD upload package composition.** A NOMAD upload consists of the
+`*.archive.yaml` plus its raw data files. With `hdf_reference_mode=True`
+(the `HDF5Normalizer` workflow), the data file is always an HDF file
+(`.h5`/`.hdf5`) written by `EntityCollection.to_hdf5` — never a
+mammos-entity collection YAML data file. A `*.yaml` written by
+`EntityCollection.to_yaml` is an intermediate input to
+`to_nomad.to_nomad(...)` only: it cannot be uploaded as the data file next
+to an `.archive.yaml`.
+
 ## Installation
 
 ```bash
