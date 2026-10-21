@@ -60,12 +60,22 @@ archive_path = to_nomad.to_nomad(
 )
 
 # Inject the x-y plot declaration into the generated NOMAD archive YAML.
+# PlotSection must be listed BEFORE the data-filling base section
+# (HDF5Normalizer): if the data-filling section comes first, the plotly
+# figures are created before the HDF data is read and the plot stays empty
+# (nomad-FAIR issue #2717).
 archive = yaml.safe_load(Path(archive_path).read_text())
 section_name = next(iter(archive["definitions"]["sections"]))
 section = archive["definitions"]["sections"][section_name]
-section["base_sections"] = list(section.get("base_sections", [])) + [
-    "nomad.datamodel.metainfo.plot.PlotSection"
-]
+base = list(section.get("base_sections", []))
+plot_base = "nomad.datamodel.metainfo.plot.PlotSection"
+if plot_base not in base:
+    idx = next(
+        (i for i, b in enumerate(base) if "HDF5Normalizer" in b),
+        len(base),
+    )
+    base.insert(idx, plot_base)
+section["base_sections"] = base
 section["m_annotations"] = {
     "plotly_express": [
         {
