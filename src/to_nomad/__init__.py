@@ -16,6 +16,19 @@ Any metadata that is not stored in mammos-entity itself (such as the institute
 name or the data owner) is requested interactively when :func:`to_nomad` is
 called without those keyword arguments.
 
+Terminology: two kinds of YAML files
+-----------------------------------
+Do not confuse the two YAML formats involved in this package:
+
+- **NOMAD archive YAML** (``*.archive.yaml``): the upload artifact for NOMAD.
+  It contains a ``definitions`` section (the schema: sections and quantities)
+  and a ``data`` section (entry values). It is uploaded in parallel to the
+  raw data files, but can also hold values inline.
+- **mammos-entity collection YAML data file** (MaMMoS YAML): a data file
+  written by :py:meth:`mammos_entity.EntityCollection.to_yaml` and read with
+  :py:func:`mammos_entity.from_yaml`. It is an *input* to this package
+  (like MaMMoS CSV and HDF files), never a NOMAD upload artifact.
+
 Quick-start example
 -------------------
 ::
@@ -252,9 +265,10 @@ def to_nomad(
                         Either:
                         - an :class:`~mammos_entity.EntityCollection`,
                         - a single :class:`~mammos_entity.Entity`, or
-                        - a file path to MaMMoS data (`.csv`, `.yaml`, `.yml`, `.hdf`,
-                            `.h5`) which is loaded using the corresponding
-                            ``mammos_entity.from_*`` function.
+                        - a file path to a mammos-entity collection data file
+                            (MaMMoS YAML `.yaml`/`.yml`, CSV `.csv`, or HDF
+                            `.hdf`/`.h5`) which is loaded using the
+                            corresponding ``mammos_entity.from_*`` function.
 
         output:
             Destination path for the generated ``.archive.yaml`` file.
@@ -286,10 +300,13 @@ def to_nomad(
             ``m_annotations.hdf5.path`` and include ``data_file`` in data, while
             omitting inline entity values from the YAML ``data`` section.
         file_reference_mode:
-            If ``True`` and *data* is a CSV/YAML path, avoid inlining values in
-            YAML ``data`` and instead reference the uploaded source file via
-            ``data_file``. For CSV, add tabular parser annotations so NOMAD can
-            ingest values from the CSV content directly.
+            If ``True`` and *data* is a mammos-entity collection data file
+            (MaMMoS CSV or YAML), avoid inlining values in the NOMAD archive
+            YAML ``data`` section and instead reference the uploaded source
+            file via ``data_file``. For CSV, add tabular parser annotations
+            so NOMAD can ingest values from the CSV content directly. For
+            MaMMoS YAML data files there is no built-in NOMAD parser, so
+            values remain inline in the NOMAD archive YAML.
         hdf_entity_names:
             Optional list of top-level entity names to include when input is
             HDF. This allows the HDF file to contain more datasets than shown
@@ -614,9 +631,10 @@ def to_nomad(
         and source_path
         and source_suffix in {".csv", ".yaml", ".yml"}
     ):
-        # CSV can be parsed by NOMAD tabular annotations, so values do not need
-        # to be inlined. YAML has no equivalent built-in parser mapping here,
-        # therefore keep inline values to avoid unresolved (grayed out) fields.
+        # MaMMoS CSV can be parsed by NOMAD tabular annotations, so values do
+        # not need to be inlined. mammos-entity YAML data files have no
+        # equivalent built-in parser mapping, therefore keep inline values
+        # to avoid unresolved (grayed out) fields.
         include_entity_values = source_suffix in {".yaml", ".yml"}
         extra_quantities["data_file"] = {
             "type": "str",
