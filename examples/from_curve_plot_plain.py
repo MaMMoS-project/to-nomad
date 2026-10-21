@@ -12,8 +12,10 @@ This demo shows the full x-y-plot mechanism from the specification:
 3. The plot declaration is injected into the generated archive: the entry
    section gains the ``nomad.datamodel.metainfo.plot.PlotSection`` base
    section and a ``plotly_express`` scatter annotation pairing the two
-   quantities as x and y, so the NOMAD GUI renders the curve as an x-y
-   plot instead of two separate vectors.
+   quantities as x and y. The annotation's ``layout`` block titles the plot
+   and both axes with their physical meaning and units (taken from the
+   quantity definitions), so the NOMAD GUI renders a labelled x-y curve
+   instead of two separate vectors.
 
 The plot injection is done here on the generated YAML (not yet inside
 to-nomad) — the in-tool feature is the subject of the x-y-plot
@@ -67,6 +69,14 @@ archive_path = to_nomad.to_nomad(
 archive = yaml.safe_load(Path(archive_path).read_text())
 section_name = next(iter(archive["definitions"]["sections"]))
 section = archive["definitions"]["sections"][section_name]
+
+
+def unit_of(quantity_name: str) -> str:
+    """Return the unit string of an entry-section quantity from the archive."""
+    quantity_defs = section.get("quantities", {})
+    return quantity_defs.get(quantity_name, {}).get("unit", "dimensionless")
+
+
 base = list(section.get("base_sections", []))
 plot_base = "nomad.datamodel.metainfo.plot.PlotSection"
 if plot_base not in base:
@@ -82,7 +92,18 @@ section["m_annotations"] = {
             "method": "scatter",
             "x": "#field_strength",
             "y": "#magnetization",
-            "title": "M(H) — plain (non-mammos-entity) data",
+            "label": "M(H) curve",
+            "layout": {
+                "title": {"text": "Magnetization vs Field"},
+                "xaxis": {
+                    "title": {
+                        "text": f"Magnetic Field Strength ({unit_of('field_strength')})"
+                    }
+                },
+                "yaxis": {
+                    "title": {"text": f"Magnetization ({unit_of('magnetization')})"}
+                },
+            },
         }
     ]
 }
@@ -91,7 +112,10 @@ final_path = save_archive_yaml(archive, archive_path)
 # Verify the injected annotation.
 check = yaml.safe_load(Path(final_path).read_text())
 injected = check["definitions"]["sections"][section_name]["m_annotations"]
-assert injected["plotly_express"][0]["x"] == "#field_strength"
+trace = injected["plotly_express"][0]
+assert trace["x"] == "#field_strength"
+assert "A / m" in trace["layout"]["xaxis"]["title"]["text"]
+assert "A / m" in trace["layout"]["yaxis"]["title"]["text"]
 
 print(f"Saved:     {hdf_input}")
 print(f"Generated: {final_path} (with PlotSection x-y plot annotation)")
