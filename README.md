@@ -32,6 +32,16 @@ For further information on the ontology and its use-case with mammos-entity see 
   include a `mammos_entities` subsection with per-quantity metadata (`name`,
   `ontology_label`, `ontology_iri`, `unit`, `description`, `source_type`).
 
+## Terminology: two kinds of YAML
+
+This package deals with two distinct YAML formats — do not confuse them:
+
+| | NOMAD archive YAML | mammos-entity collection YAML |
+|---|---|---|
+| Typical filename | `*.archive.yaml` | `*.yaml` / `*.yml` |
+| Role | Upload artifact for NOMAD: `definitions` (schema) + `data` (entry values). Uploaded in parallel to the raw data files, but can hold values inline. | MaMMoS *data file* written by `EntityCollection.to_yaml` and read with `mammos_entity.from_yaml`. An **input** to `to-nomad`, never a NOMAD artifact. |
+| Created by | `to_nomad.to_nomad(...)` | `mammos_entity` itself |
+
 ## Installation
 
 ```bash
@@ -225,6 +235,39 @@ python -m to_nomad.prepare_csv_for_nomad input.csv output.csv --no-sanitize
 
 Note: For simple cases, you can also load the CSV with `mammos_entity.from_csv()`,
 then use entity names directly (programmatic entities don't have special characters).
+
+## Nested EntityCollections
+
+**Creating nested collections** is plain Python — no file is involved:
+
+```python
+sub = me.EntityCollection(description="Intrinsic properties", Ms=..., ...)
+sample = me.EntityCollection(description="Sample", intrinsic=sub)
+```
+
+**Saving and loading nested data** (the *data-file* level, independent of NOMAD):
+
+| Format | Nested sub-collections | Reader |
+|---|---|---|
+| HDF5 (`.h5`) | Yes — nested groups | `me.from_hdf5` |
+| MaMMoS YAML (`.yaml`) | Yes — recursive collection nodes (v2 format) | `me.from_yaml` |
+| CSV (`.csv`) | No — flat, single table | `me.from_csv` |
+
+**In the NOMAD archive YAML** nested collections become sub-sections
+(`definitions`) and nested dictionaries (`data`).
+
+**Value storage in the NOMAD archive YAML:**
+
+- Inline mode (default): entity values are written into the `data` section.
+- `hdf_reference_mode=True`: the input *must* be an HDF file path, because
+  NOMAD's `HDF5Normalizer` reads the uploaded `.h5` file. Every quantity —
+  entity or plain value, at any nesting depth — is annotated with
+  `m_annotations.hdf5.path` pointing to its HDF5 dataset, and values are
+  omitted from the archive. Plain values inside sub-collections are
+  additionally kept inline. Upload the archive YAML together with the `.h5`
+  file (see also the `hdf_reference_mode` notes in the API section).
+
+See `examples/from_nested_collection.py` for a runnable demonstration.
 
 ## API
 
