@@ -56,4 +56,3 @@ to_nomad.to_nomad(
 
 print(f"HDF5 file with NeXus metadata: {h5_path}")
 print(f"NOMAD Archive YAML with plot:  {yaml_path}")
-
