@@ -1,7 +1,9 @@
 # Example input data
 
-**Full source upload on NOMAD: [MaMMoS_IFW_SEM](https://nomad-lab.eu/prod/rae/gui/search/uploads/upload/id/6NzAe8uWS5SCsuKNvl7EUw)**
-([entry IFW-SEM-Data](https://nomad-lab.eu/prod/rae/gui/entry/id/9JfRldglcycgSpsOe7eU8y6zRP4Z))
+**Full source upload on NOMAD: [MaMMoS_IFW_SEM](https://nomad-lab.eu/gui/upload/id/6NzAe8uWS5SCsuKNvl7EUw)**
+([entry IFW-SEM-Data](https://nomad-lab.eu/gui/upload/id/6NzAe8uWS5SCsuKNvl7EUw/entry/id/9JfRldglcycgSpsOe7eU8y6zRP4Z))
+
+*(both links verified accessible without login)*
 
 ## 22632_01_CBS.tif
 

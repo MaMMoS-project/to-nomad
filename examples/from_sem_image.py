@@ -41,8 +41,10 @@ sem_image = me.EntityCollection(
 )
 
 # Ontology-backed measurement context stored alongside the image.
+# NOTE: the values below are exemplar values for demonstration purposes,
+# not the actual imaging conditions of the source micrograph.
 measurement_conditions = me.EntityCollection(
-    description="Measurement conditions during imaging",
+    description="Measurement conditions during imaging (exemplar values)",
     temperature=me.Entity("ThermodynamicTemperature", 295, "K"),
     magnetic_field=me.Entity("MagneticFieldStrength", 0.0, "A/m"),
 )
