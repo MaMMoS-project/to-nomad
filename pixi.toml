@@ -19,3 +19,21 @@ hatchling = "*"
 
 [pypi-dependencies]
 to-nomad = { path = ".", editable = true }
+
+# Optional development-only environment for local NOMAD validation.
+# NOT installed for regular users: `pixi install` (default) only creates the
+# default environment; this one is created on first use of `-e nomad-test`.
+[feature.nomad-test.pypi-dependencies]
+nomad-lab = ">=1.4.3,<1.5"
+# nomad/files.py imports zipstream unconditionally, but nomad-lab only
+# declares zipstream-ng under the 'infrastructure' extra.
+zipstream-ng = "*"
+# nomad/archive/required.py imports fastapi unconditionally (same reason).
+fastapi = "*"
+
+[feature.nomad-test.tasks]
+parse = "nomad parse --parser parsers/archive --show-archive"
+validate = "python scripts/validate_archive_locally.py"
+
+[environments]
+nomad-test = ["nomad-test"]
