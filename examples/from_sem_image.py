@@ -39,9 +39,18 @@ sem_image = me.EntityCollection(
     description="Scanning electron microscope image",
     image_data=image,  # plain numpy array: stored once in the HDF5 file
 )
+
+# Ontology-backed measurement context stored alongside the image.
+measurement_conditions = me.EntityCollection(
+    description="Measurement conditions during imaging",
+    temperature=me.Entity("ThermodynamicTemperature", 295, "K"),
+    magnetic_field=me.Entity("MagneticFieldStrength", 0.0, "A/m"),
+)
+
 sample = me.EntityCollection(
     description="Sample with an SEM micrograph",
     sample_id="SEM-DEMO-001",  # plain value: HDF5-referenced and kept inline
+    measurement_conditions=measurement_conditions,
     sem_image=sem_image,
 )
 
