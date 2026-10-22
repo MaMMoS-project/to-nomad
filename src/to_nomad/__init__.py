@@ -200,7 +200,8 @@ def _apply_nexus_plot_attributes(
                     continue
                 x = plot.get("x")
                 y = plot.get("y")
-                if not x or not y:
+                img = plot.get("img") or plot.get("z")
+                if not ((x and y) or img):
                     continue
 
                 target = plot.get("target") or ""
@@ -212,20 +213,20 @@ def _apply_nexus_plot_attributes(
                     grp = f[group_path]
                     if isinstance(grp, h5py.Group):
                         grp.attrs["NX_class"] = "NXdata"
-                        grp.attrs["signal"] = y
-                        grp.attrs["axes"] = [x]
-                        if (
-                            x in grp
-                            and "unit" in grp[x].attrs
-                            and "units" not in grp[x].attrs
-                        ):
-                            grp[x].attrs["units"] = grp[x].attrs["unit"]
-                        if (
-                            y in grp
-                            and "unit" in grp[y].attrs
-                            and "units" not in grp[y].attrs
-                        ):
-                            grp[y].attrs["units"] = grp[y].attrs["unit"]
+                        if img and not (x and y):
+                            # 2-D image: signal only; H5Web renders a 2-D
+                            # NXdata signal as an image without axes.
+                            grp.attrs["signal"] = img
+                        else:
+                            grp.attrs["signal"] = y
+                            grp.attrs["axes"] = [x]
+                        for name in {n for n in (x, y, img) if n}:
+                            if (
+                                name in grp
+                                and "unit" in grp[name].attrs
+                                and "units" not in grp[name].attrs
+                            ):
+                                grp[name].attrs["units"] = grp[name].attrs["unit"]
     except Exception:
         pass
 

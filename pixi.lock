@@ -111,6 +111,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/requests-2.32.5-pyhcf101f3_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/stack_data-0.6.3-pyhd8ed1ab_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/tifffile-2026.10.15-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tomli-2.4.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/traitlets-5.16.1-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/trove-classifiers-2026.1.14.14-pyhd8ed1ab_0.conda
@@ -239,6 +240,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/requests-2.34.2-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/stack_data-0.6.3-pyhd8ed1ab_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/tifffile-2026.10.15-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tomlkit-0.15.2-pyh5ded981_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/traitlets-5.16.1-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/trove-classifiers-2026.9.21.13-pyh5ded981_0.conda
@@ -250,6 +252,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/09/ab/c8f982c4dfaab49200e31820a4ffe6275356f7dcaaa1024735d8f8b4e048/aiobotocore-3.9.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/0b/e4/9b7ef7a8e0bb416e0fe1879c92295041cf81e5a47e3c3110744e89b6eb35/elastic_transport-9.4.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/10/1e/bf9d53f7aa3a4e30066f3e305410da053baf4c29359184605d593572558c/json_stream_rs_tokenizer-0.5.4-cp314-cp314-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/10/a1/510b0a7fadc6f43a6ce50152e69dbd86415240835868bb0bd9b5b88b1e06/aioitertools-0.13.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/10/ef/1ad6577509a75ce11bc92a8d2365ab42ff1d2b8178501a25b2a43b3bd02b/msglc-261017-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -265,6 +268,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/29/5e/52f56f93d5b20815ee0ae352f7a38eff25580edb180b4fa7df87cfeba68f/matplotlib-3.11.2-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/31/a4/ee780473e42a3edaf65da1ad37f5c601a9c740e215c1e09db36bf90f3f59/jwcrypto-1.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/ea/a56b9fe5066f3537b7882f77e9c5dfb26d8c2eefdaed9b5fc73d57b4dc22/pydantic-2.14.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/36/f4/68ad0cdcccd612cb39356164d3f25528f52d9920dfe77c63aa5cc143fcc1/nomad_lab-2.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3b/00/2344469e2084fb287c2e0b57b72910309874c3245463acd6cf5e3db69324/appdirs-1.4.4-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3c/74/fdf926afe145d8629c4b2ff57f4ea1d64ed7abc4d84d97463b2517a2547e/pydantic_settings-2.16.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3d/08/feb9a196269ba7809f44f9117d9e4a601c41c313f6144fd0c337293a5488/msgpack-1.2.3-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
@@ -277,6 +281,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/49/ea/4c80f75f3c3dc16becfa81b0239f4d07359e18be0c19258fcb628e634740/bitarray-3.12.3-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/4c/11/14c9b40ab5aa27f40b88d4754a18dd0e457aab03ae6d66de897577fb5697/molid-0.8.5-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/56/95/9377bcb415797e44274b51d46e3249eba641711cf3348050f76ee7b15ffc/httpx-0.27.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5a/4c/694f7d44f2399b3901232d6ded1c88442a02fc8141936396d9289d951848/cachetools-7.2.4-py3-none-any.whl
@@ -294,8 +299,9 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6c/c0/a98505f18594f1bce828bb159cec0fcf9860562f1a2c85913409fc8f3d9e/fsspec-2026.9.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/71/43/1947f06babed6b3f1d7f38b0c767f52df66bfb2bc10b468c4a7de9eceff2/aiohappyeyeballs-2.7.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/75/44/e6d863aebd6d57a1de20d2350328379b5b970c29a217af349793f12d753c/zipstream_ng-1.9.3-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/78/6e/047d517a64249abd0a1b5b8c9f8244e3bf48c6916d5a68e9c76c52fc266d/elasticsearch-9.5.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/79/fe/fef04b2cc2930edba11095f9e9b5c2797f8594fc54316195cc39d3c3bc63/fonttools-4.67.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/7a/35/5be0558cb93b69d8da5235d0f9448b8fdaccb988b60c8e18f332632d3d9b/elasticsearch_dsl-7.4.1-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7e/cd/fe58041e9011f307c490e3e17dd48cc516448f7c698a3f2d9d9d65d7e6a8/networkx-3.7-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/88/39/799be3f2f0f38cc727ee3b4f1445fe6d5e4133064ec2e4115069418a5bb6/cloudpickle-3.1.2-py3-none-any.whl
@@ -319,9 +325,11 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a7/b2/fabede9fafd976b991e9f1b9c8c873ed86f202889b864756f240ce6dd855/frozenlist-1.8.0-cp314-cp314-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/a8/eb/c51d3b54dfaa9267a687359d946dc2a1ca6a27fb4d381773e59b7bd72bf4/botocore-1.43.106-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ae/b3/a0f0f4faac229b0011d8c4a7ee6da7c2dca0b6fd08039c95920846f23ca4/kaleido-0.2.1-py2.py3-none-manylinux1_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/af/c2/ce417c397afa5181f0e3c6ff01a4d01639414e1adef08730d97571297151/httpcore2-2.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b1/29/c028a0731e202035f0e2e0bfbf1a3e46ad6c628cbb17f6f1cc9eea5d9ff1/pathlib_abc-0.5.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b7/d5/01ea71591a29e88926582e3ca7ed32f8b933e9ebc99187a7ab100587242d/pint-0.26.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b8/4c/69e911438d0ab15b3023603bf9b69d82d73a57137af0134d58075b99d749/elasticsearch7-7.17.13-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bc/8a/340a1555ae33d7354dbca4faa54948d76d89a27ceef032c8c3bc661d003e/aiofiles-25.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bc/9c/15fb18bd708949dc953fe120be8d3c7a1b1b140c2592a9c81ce7961e9ecf/s3fs-2026.9.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bc/9f/569a8bbdb0859498d33d8b86273bc82849bd0b445ac01416ad34996ca3d8/python_keycloak-7.1.1-py3-none-any.whl
@@ -331,13 +339,11 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/cf/8c/9677dad226e5aaac5b823d5b09d881ebc32ff1648af417597649841e516c/contourpy-1.4.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/cf/f7/3367feadd4ab56783b0971c9b7edfbdd68e0c70ce877949a5dd2117ed4a0/palettable-3.3.3-py2.py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/d4/06/be118b997069ff6643b5dafb13e60442bf65ec6530f3ef714d6455b11ae5/elasticsearch-7.17.13-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d6/26/1ff2b0721ac66a3ec5b1402b333110b352ab0a8724052ac279a7b82d40c4/tenacity-9.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/a2/d2374e6ff8f0ef1cc106687189b642c184e8fb2070a73be7f9e43fdb0ce0/pymatgen_core-2026.10.16-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/dd/1a/5d9a402b39ec892d856bbdd9db502ff73ce28cdf4aff72eb1ce1d6843506/universal_pathlib-0.3.10-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e5/ae/580600f441f6fc05218bd6c9d5794f4aef072a7d9093b291f1c50a9db8bc/plotly-5.24.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e5/fa/5f9baeecf35db1d35ca5415dfa1e8656d656ccbbaca875e65d72df849f4e/cbor2-6.1.5-cp314-cp314-manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/e6/e8/7a0bc5164df2d7a3f39b73cdafc7509e115d84e68067aa21d529c80c3fe6/nomad_lab-1.4.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e9/02/4e7d553a7ac4b4238b38b3c1b80d486e9d4436f8d2acbf87a0997fe3f402/cffi-2.1.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/e9/44/27e3cee3dcdb3b7bc09727b642bdbfcd098490ea77df04611db9060d7722/lxml-6.1.3-cp314-cp314-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl
@@ -3017,6 +3023,22 @@ packages:
   run_exports: {}
   size: 26988
   timestamp: 1733569565672
+- conda: https://conda.anaconda.org/conda-forge/noarch/tifffile-2026.10.15-pyhc364b38_0.conda
+  sha256: 74205e597f33d5aa55dc535481cff7d7341b8026c1698be0d0c62f1e7c42110f
+  md5: 69311a22cf97c3c9840108555b83e4f7
+  depends:
+  - python >=3.12
+  - numpy >=2.1
+  - python
+  constrains:
+  - matplotlib-base >=3.3
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/tifffile?source=compressed-mapping
+  run_exports: {}
+  size: 234030
+  timestamp: 1792143963108
 - conda: https://conda.anaconda.org/conda-forge/noarch/tomli-2.4.0-pyhcf101f3_0.conda
   sha256: 62940c563de45790ba0f076b9f2085a842a65662268b02dd136a8e9b1eaf47a8
   md5: 72e780e9aa2d0a3295f59b1874e3768b
@@ -3199,6 +3221,34 @@ packages:
   - httpx>=0.25.1,<0.29 ; extra == 'httpx'
   - anyio>=4.11.0,<5 ; extra == 'httpx2'
   - httpx2>=2.0,<3.0.0 ; extra == 'httpx2'
+  requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/0b/e4/9b7ef7a8e0bb416e0fe1879c92295041cf81e5a47e3c3110744e89b6eb35/elastic_transport-9.4.2-py3-none-any.whl
+  name: elastic-transport
+  version: 9.4.2
+  sha256: 33dc89bb1855faa8b98ae8b036405a39c562778dbcdbe4a00a2eaf753148556c
+  requires_dist:
+  - urllib3>=2,<3
+  - certifi
+  - sniffio
+  - pytest ; extra == 'develop'
+  - pytest-cov ; extra == 'develop'
+  - pytest-mock ; extra == 'develop'
+  - pytest-asyncio ; extra == 'develop'
+  - pytest-httpbin ; extra == 'develop'
+  - pytest-httpserver ; extra == 'develop'
+  - trustme ; extra == 'develop'
+  - requests ; extra == 'develop'
+  - aiohttp ; extra == 'develop'
+  - httpx ; extra == 'develop'
+  - respx ; extra == 'develop'
+  - opentelemetry-api ; extra == 'develop'
+  - opentelemetry-sdk ; extra == 'develop'
+  - orjson ; extra == 'develop'
+  - anyio ; extra == 'develop'
+  - trio ; extra == 'develop'
+  - sphinx>2 ; extra == 'develop'
+  - furo ; extra == 'develop'
+  - sphinx-autodoc-typehints ; extra == 'develop'
   requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/10/1e/bf9d53f7aa3a4e30066f3e305410da053baf4c29359184605d593572558c/json_stream_rs_tokenizer-0.5.4-cp314-cp314-manylinux_2_28_x86_64.whl
   name: json-stream-rs-tokenizer
@@ -3415,6 +3465,99 @@ packages:
   - email-validator>=2.0.0 ; extra == 'email'
   - tzdata ; sys_platform == 'win32' and extra == 'timezone'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/36/f4/68ad0cdcccd612cb39356164d3f25528f52d9920dfe77c63aa5cc143fcc1/nomad_lab-2.0.0-py3-none-any.whl
+  name: nomad-lab
+  version: 2.0.0
+  sha256: ae63264bd7714b175bbaca3569319dd98416c75fb95735e6a4b67bc83964a48e
+  requires_dist:
+  - ase>=3.25.0
+  - bitarray>=2.3.5
+  - cachetools>=4.2.4
+  - click>=7.1.2
+  - docstring-parser>=0.12
+  - elasticsearch>=9,<10
+  - elasticsearch7>=7.17,<8
+  - fsspec>=2026.2.0
+  - h5py>=3.6.0
+  - httpx2>=2,<3
+  - jmespath>=0.10.0
+  - jsonpath-ng
+  - json-stream
+  - kaleido<=0.2.1
+  - lxml>=5.2
+  - matid>=2.1.3
+  - molid>=0.8.5
+  - msglc[msgspec,s3fs]>=260825
+  - numpy>=1.22.4
+  - openpyxl
+  - orjson>=1.0
+  - pandas>=2
+  - pathvalidate
+  - pint>=0.23
+  - plotly<6
+  - py-spy
+  - pydantic>=2
+  - pyinstrument
+  - pymatgen>=2025.10.7
+  - python-keycloak>=5.0
+  - python-magic-bin ; sys_platform == 'win32'
+  - python-magic ; sys_platform != 'win32'
+  - pyyaml>=6.0
+  - requests>=2.27.1
+  - rfc3161ng>=2.1.3
+  - s3fs>=2026.2.0
+  - scipy>=1.7.1
+  - unidecode
+  - xarray>=0.20.2
+  - beautifulsoup4>=4,<=4.12.3 ; extra == 'infrastructure'
+  - blinker ; extra == 'infrastructure'
+  - dockerspawner ; extra == 'infrastructure'
+  - fastapi>=0.99.0,<0.137.0 ; extra == 'infrastructure'
+  - starlette>=1.3.1 ; extra == 'infrastructure'
+  - fastapi-cache2 ; extra == 'infrastructure'
+  - gunicorn ; extra == 'infrastructure'
+  - h5grove[fastapi]>=3 ; extra == 'infrastructure'
+  - jupyterhub<5.0.0 ; extra == 'infrastructure'
+  - beanie>=2.0.0 ; extra == 'infrastructure'
+  - mongoengine ; extra == 'infrastructure'
+  - oauthenticator>=16.3.1 ; extra == 'infrastructure'
+  - optimade[mongo]>=1.2.0,<1.4.0 ; extra == 'infrastructure'
+  - pyjwt[crypto]>=2.15.0 ; extra == 'infrastructure'
+  - python-logstash ; extra == 'infrastructure'
+  - python-multipart>=0.0.27 ; extra == 'infrastructure'
+  - rdflib==5 ; extra == 'infrastructure'
+  - structlog ; extra == 'infrastructure'
+  - tabulate ; extra == 'infrastructure'
+  - temporalio>=1.27.2 ; extra == 'infrastructure'
+  - cryptography ; extra == 'infrastructure'
+  - opentelemetry-api ; extra == 'infrastructure'
+  - opentelemetry-sdk ; extra == 'infrastructure'
+  - opentelemetry-instrumentation-fastapi ; extra == 'infrastructure'
+  - opentelemetry-exporter-otlp ; extra == 'infrastructure'
+  - opentelemetry-instrumentation-asgi==0.63b1 ; extra == 'infrastructure'
+  - opentelemetry-exporter-otlp-proto-grpc>=1.39.1 ; extra == 'infrastructure'
+  - opentelemetry-instrumentation-pymongo==0.63b1 ; extra == 'infrastructure'
+  - opentelemetry-instrumentation-elasticsearch==0.63b1 ; extra == 'infrastructure'
+  - prometheus-client ; extra == 'infrastructure'
+  - pymongo>=4.18.2 ; extra == 'infrastructure'
+  - uvicorn[standard] ; extra == 'infrastructure'
+  - validators ; extra == 'infrastructure'
+  - zipstream-ng ; extra == 'infrastructure'
+  - aiosmtpd>=1 ; extra == 'dev'
+  - essential-generators ; extra == 'dev'
+  - mypy>=1.15 ; extra == 'dev'
+  - pip-audit ; extra == 'dev'
+  - pip>=26.1.2 ; extra == 'dev'
+  - pytest-asyncio ; extra == 'dev'
+  - pytest-cov ; extra == 'dev'
+  - pytest-socket ; extra == 'dev'
+  - pytest-split ; extra == 'dev'
+  - pytest-timeout ; extra == 'dev'
+  - pytest-xdist ; extra == 'dev'
+  - pytest ; extra == 'dev'
+  - python-gitlab ; extra == 'dev'
+  - ruff>=0.16.0 ; extra == 'dev'
+  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/3b/00/2344469e2084fb287c2e0b57b72910309874c3245463acd6cf5e3db69324/appdirs-1.4.4-py2.py3-none-any.whl
   name: appdirs
   version: 1.4.4
@@ -3555,6 +3698,11 @@ packages:
   - requests>=2.20.0
   - tqdm
   - openbabel-wheel ; extra == 'openbabel'
+  requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl
+  name: truststore
+  version: 0.10.5
+  sha256: 9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c
   requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/56/95/9377bcb415797e44274b51d46e3249eba641711cf3348050f76ee7b15ffc/httpx-0.27.2-py3-none-any.whl
   name: httpx
@@ -3871,6 +4019,56 @@ packages:
   version: 1.9.3
   sha256: 6614580d7ae56bc9f3c2a342210108450e2d191b62038e818bae7845612584b7
   requires_python: '>=3.5'
+- pypi: https://files.pythonhosted.org/packages/78/6e/047d517a64249abd0a1b5b8c9f8244e3bf48c6916d5a68e9c76c52fc266d/elasticsearch-9.5.1-py3-none-any.whl
+  name: elasticsearch
+  version: 9.5.1
+  sha256: a980d8888ae70c03f0a1db6b2c5e3e39bf4e235abea737f522d2fd1d2d20bb99
+  requires_dist:
+  - anyio
+  - elastic-transport>=9.4.1,<10
+  - python-dateutil
+  - sniffio
+  - typing-extensions
+  - aiohttp>=3,<4 ; extra == 'async'
+  - aiohttp ; extra == 'dev'
+  - anyio[trio] ; extra == 'dev'
+  - black ; extra == 'dev'
+  - build ; extra == 'dev'
+  - coverage ; extra == 'dev'
+  - httpx ; extra == 'dev'
+  - isort ; extra == 'dev'
+  - jinja2 ; extra == 'dev'
+  - mapbox-vector-tile ; extra == 'dev'
+  - mypy ; extra == 'dev'
+  - nox ; extra == 'dev'
+  - numpy ; extra == 'dev'
+  - orjson ; extra == 'dev'
+  - pandas ; extra == 'dev'
+  - pyarrow ; python_full_version < '3.14' and extra == 'dev'
+  - pydantic ; extra == 'dev'
+  - pyright ; extra == 'dev'
+  - pytest ; extra == 'dev'
+  - pytest-asyncio ; extra == 'dev'
+  - pytest-cov ; extra == 'dev'
+  - pytest-mock ; extra == 'dev'
+  - python-dateutil ; extra == 'dev'
+  - pyyaml>=5.4 ; extra == 'dev'
+  - requests>=2,<3 ; extra == 'dev'
+  - simsimd ; extra == 'dev'
+  - tqdm ; extra == 'dev'
+  - twine ; extra == 'dev'
+  - types-python-dateutil ; extra == 'dev'
+  - types-tqdm ; extra == 'dev'
+  - unasync ; extra == 'dev'
+  - sphinx ; extra == 'docs'
+  - sphinx-autodoc-typehints ; extra == 'docs'
+  - sphinx-rtd-theme>=2.0 ; extra == 'docs'
+  - orjson>=3 ; extra == 'orjson'
+  - pyarrow>=1 ; extra == 'pyarrow'
+  - requests>=2.4.0,!=2.32.2,<3.0.0 ; extra == 'requests'
+  - numpy>=1 ; extra == 'vectorstore-mmr'
+  - simsimd>=3 ; extra == 'vectorstore-mmr'
+  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/79/fe/fef04b2cc2930edba11095f9e9b5c2797f8594fc54316195cc39d3c3bc63/fonttools-4.67.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
   name: fonttools
   version: 4.67.0
@@ -3905,24 +4103,27 @@ packages:
   - skia-pathops>=0.5.0 ; extra == 'all'
   - uharfbuzz>=0.45.0 ; extra == 'all'
   requires_python: '>=3.11'
-- pypi: https://files.pythonhosted.org/packages/7a/35/5be0558cb93b69d8da5235d0f9448b8fdaccb988b60c8e18f332632d3d9b/elasticsearch_dsl-7.4.1-py2.py3-none-any.whl
-  name: elasticsearch-dsl
-  version: 7.4.1
-  sha256: 97f79239a252be7c4cce554c29e64695d7ef6a4828372316a5e5ff815e7a7498
+- pypi: https://files.pythonhosted.org/packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl
+  name: httpx2
+  version: 2.16.0
+  sha256: fd2c5d7909e8d86fe92d53020c310ca0e4e431b838c207c5754b9bbf0308d49a
   requires_dist:
-  - six
-  - python-dateutil
-  - elasticsearch>=7.0.0,<8.0.0
-  - ipaddress ; python_full_version < '3.3'
-  - mock ; extra == 'develop'
-  - pytest>=3.0.0 ; extra == 'develop'
-  - pytest-cov ; extra == 'develop'
-  - pytest-mock<3.0.0 ; extra == 'develop'
-  - pytz ; extra == 'develop'
-  - coverage<5.0.0 ; extra == 'develop'
-  - sphinx ; extra == 'develop'
-  - sphinx-rtd-theme ; extra == 'develop'
-  requires_python: '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*'
+  - anyio>=4.10 ; sys_platform != 'emscripten'
+  - httpcore2==2.16.0 ; sys_platform != 'emscripten'
+  - httpx2-jsfetch ; python_full_version >= '3.12' and sys_platform == 'emscripten'
+  - idna>=3.18
+  - truststore>=0.10 ; sys_platform != 'emscripten'
+  - typing-extensions>=4.5.0 ; python_full_version < '3.13'
+  - brotli>=1.2.0 ; platform_python_implementation == 'CPython' and extra == 'brotli'
+  - brotlicffi>=1.2.0.2 ; platform_python_implementation != 'CPython' and extra == 'brotli'
+  - click>=8.4.2 ; extra == 'cli'
+  - pygments==2.* ; extra == 'cli'
+  - rich>=10,<16 ; extra == 'cli'
+  - h2>=3,<5 ; extra == 'http2'
+  - socksio==1.* ; extra == 'socks'
+  - wsproto>=1.2 ; extra == 'ws'
+  - backports-zstd>=1.0.0 ; python_full_version < '3.14' and extra == 'zstd'
+  requires_python: '>=3.11'
 - pypi: https://files.pythonhosted.org/packages/7e/cd/fe58041e9011f307c490e3e17dd48cc516448f7c698a3f2d9d9d65d7e6a8/networkx-3.7-py3-none-any.whl
   name: networkx
   version: '3.7'
@@ -4206,6 +4407,18 @@ packages:
   sha256: aa21cf1bf1c78f8fa50a9f7d45e1003c387bd3d6fe0a767cfbbf344b95bdc3a8
   requires_dist:
   - pathlib ; python_full_version < '3.4'
+- pypi: https://files.pythonhosted.org/packages/af/c2/ce417c397afa5181f0e3c6ff01a4d01639414e1adef08730d97571297151/httpcore2-2.16.0-py3-none-any.whl
+  name: httpcore2
+  version: 2.16.0
+  sha256: 5c4358319f2602d984ad93182c9fee5160f22e9da7babdda870a5e7c4e2dc34f
+  requires_dist:
+  - h11>=0.16
+  - truststore>=0.10
+  - anyio>=4.5.0,<5.0 ; extra == 'asyncio'
+  - h2>=3,<5 ; extra == 'http2'
+  - socksio==1.* ; extra == 'socks'
+  - trio>=0.34.0,<1.0 ; extra == 'trio'
+  requires_python: '>=3.11'
 - pypi: https://files.pythonhosted.org/packages/b1/29/c028a0731e202035f0e2e0bfbf1a3e46ad6c628cbb17f6f1cc9eea5d9ff1/pathlib_abc-0.5.2-py3-none-any.whl
   name: pathlib-abc
   version: 0.5.2
@@ -4294,6 +4507,29 @@ packages:
   - ryd ; extra == 'docs'
   - mercurial>5.7 ; extra == 'docs'
   requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/b8/4c/69e911438d0ab15b3023603bf9b69d82d73a57137af0134d58075b99d749/elasticsearch7-7.17.13-py2.py3-none-any.whl
+  name: elasticsearch7
+  version: 7.17.13
+  sha256: 92c7f6c225d8d8055b60529214c001076e47754ad696ce266223e6271c15ac9c
+  requires_dist:
+  - urllib3>=1.21.1,<2 ; python_full_version < '3.10'
+  - urllib3>=1.21.1,<3 ; python_full_version >= '3.10'
+  - certifi
+  - requests>=2.0.0,<3.0.0 ; extra == 'develop'
+  - coverage ; extra == 'develop'
+  - mock ; extra == 'develop'
+  - pyyaml ; extra == 'develop'
+  - pytest ; extra == 'develop'
+  - pytest-cov ; extra == 'develop'
+  - sphinx<1.7 ; extra == 'develop'
+  - sphinx-rtd-theme ; extra == 'develop'
+  - black ; extra == 'develop'
+  - jinja2 ; extra == 'develop'
+  - sphinx<1.7 ; extra == 'docs'
+  - sphinx-rtd-theme ; extra == 'docs'
+  - requests>=2.4.0,<3.0.0 ; extra == 'requests'
+  - aiohttp>=3,<4 ; extra == 'async'
+  requires_python: '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,<4'
 - pypi: https://files.pythonhosted.org/packages/bc/8a/340a1555ae33d7354dbca4faa54948d76d89a27ceef032c8c3bc661d003e/aiofiles-25.1.0-py3-none-any.whl
   name: aiofiles
   version: 25.1.0
@@ -4398,29 +4634,6 @@ packages:
   version: 3.3.3
   sha256: 74e9e7d7fe5a9be065e02397558ed1777b2df0b793a6f4ce1a5ee74f74fb0caa
   requires_python: '>=3.7'
-- pypi: https://files.pythonhosted.org/packages/d4/06/be118b997069ff6643b5dafb13e60442bf65ec6530f3ef714d6455b11ae5/elasticsearch-7.17.13-py2.py3-none-any.whl
-  name: elasticsearch
-  version: 7.17.13
-  sha256: dac73df9a9070b9c96be45d99f4316badc525f8b17f418e9c86da2bb5855c892
-  requires_dist:
-  - urllib3>=1.21.1,<2 ; python_full_version < '3.10'
-  - urllib3>=1.21.1,<3 ; python_full_version >= '3.10'
-  - certifi
-  - requests>=2.0.0,<3.0.0 ; extra == 'develop'
-  - coverage ; extra == 'develop'
-  - mock ; extra == 'develop'
-  - pyyaml ; extra == 'develop'
-  - pytest ; extra == 'develop'
-  - pytest-cov ; extra == 'develop'
-  - sphinx<1.7 ; extra == 'develop'
-  - sphinx-rtd-theme ; extra == 'develop'
-  - black ; extra == 'develop'
-  - jinja2 ; extra == 'develop'
-  - sphinx<1.7 ; extra == 'docs'
-  - sphinx-rtd-theme ; extra == 'docs'
-  - requests>=2.4.0,<3.0.0 ; extra == 'requests'
-  - aiohttp>=3,<4 ; extra == 'async'
-  requires_python: '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,<4'
 - pypi: https://files.pythonhosted.org/packages/d6/26/1ff2b0721ac66a3ec5b1402b333110b352ab0a8724052ac279a7b82d40c4/tenacity-9.2.1-py3-none-any.whl
   name: tenacity
   version: 9.2.1
@@ -4519,97 +4732,6 @@ packages:
   name: cbor2
   version: 6.1.5
   sha256: 73b97d92ce64a344015909f1888de0abec76211b9c1f33b075563a05512f3a98
-  requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/e6/e8/7a0bc5164df2d7a3f39b73cdafc7509e115d84e68067aa21d529c80c3fe6/nomad_lab-1.4.3-py3-none-any.whl
-  name: nomad-lab
-  version: 1.4.3
-  sha256: 33c1c50f62676da195d71fe154e5e78ae862f78255901d0ac854656ffa1f4b68
-  requires_dist:
-  - ase>=3.25.0
-  - bitarray>=2.3.5
-  - cachetools>=4.2.4
-  - click>=7.1.2
-  - docstring-parser>=0.12
-  - elasticsearch-dsl>=7,<8
-  - elasticsearch>=7.17.3
-  - fsspec>=2026.2.0
-  - h5py>=3.6.0
-  - httpx>=0.23.3,<0.28
-  - jmespath>=0.10.0
-  - jsonpath-ng
-  - json-stream
-  - kaleido<=0.2.1
-  - lxml>=5.2
-  - matid>=2.1.3
-  - molid>=0.8.5
-  - msglc[msgspec,s3fs]>=260423
-  - numpy>=1.22.4
-  - openpyxl
-  - orjson>=1.0
-  - pandas>=2
-  - pathvalidate
-  - pint>=0.23
-  - plotly<6
-  - py-spy
-  - pydantic>=2
-  - pyinstrument
-  - pymatgen>=2025.10.7
-  - python-keycloak>=5.0
-  - python-magic-bin ; sys_platform == 'win32'
-  - python-magic ; sys_platform != 'win32'
-  - pyyaml>=6.0
-  - requests>=2.27.1
-  - rfc3161ng>=2.1.3
-  - scipy>=1.7.1
-  - unidecode
-  - xarray>=0.20.2
-  - beautifulsoup4>=4,<=4.12.3 ; extra == 'infrastructure'
-  - blinker ; extra == 'infrastructure'
-  - dockerspawner ; extra == 'infrastructure'
-  - fastapi>=0.99.0,<0.137.0 ; extra == 'infrastructure'
-  - starlette>=1.3.1 ; extra == 'infrastructure'
-  - fastapi-cache2 ; extra == 'infrastructure'
-  - gunicorn ; extra == 'infrastructure'
-  - h5grove[fastapi]>=3 ; extra == 'infrastructure'
-  - jupyterhub<5.0.0 ; extra == 'infrastructure'
-  - beanie>=2.0.0 ; extra == 'infrastructure'
-  - mongoengine ; extra == 'infrastructure'
-  - oauthenticator>=16.3.1 ; extra == 'infrastructure'
-  - optimade[mongo]>=1.2.0,<1.4.0 ; extra == 'infrastructure'
-  - pyjwt[crypto]>=2.13.0 ; extra == 'infrastructure'
-  - python-logstash ; extra == 'infrastructure'
-  - python-multipart>=0.0.27 ; extra == 'infrastructure'
-  - rdflib==5 ; extra == 'infrastructure'
-  - structlog ; extra == 'infrastructure'
-  - tabulate ; extra == 'infrastructure'
-  - temporalio>=1.27.2 ; extra == 'infrastructure'
-  - cryptography ; extra == 'infrastructure'
-  - opentelemetry-api ; extra == 'infrastructure'
-  - opentelemetry-sdk ; extra == 'infrastructure'
-  - opentelemetry-instrumentation-fastapi ; extra == 'infrastructure'
-  - opentelemetry-exporter-otlp ; extra == 'infrastructure'
-  - opentelemetry-instrumentation-asgi==0.63b1 ; extra == 'infrastructure'
-  - opentelemetry-exporter-otlp-proto-grpc>=1.39.1 ; extra == 'infrastructure'
-  - opentelemetry-instrumentation-pymongo==0.63b1 ; extra == 'infrastructure'
-  - opentelemetry-instrumentation-elasticsearch==0.63b1 ; extra == 'infrastructure'
-  - prometheus-client ; extra == 'infrastructure'
-  - uvicorn[standard] ; extra == 'infrastructure'
-  - validators ; extra == 'infrastructure'
-  - zipstream-ng ; extra == 'infrastructure'
-  - aiosmtpd>=1 ; extra == 'dev'
-  - essential-generators ; extra == 'dev'
-  - mypy>=1.15 ; extra == 'dev'
-  - pip-audit ; extra == 'dev'
-  - pip>=26.1.2 ; extra == 'dev'
-  - pytest-asyncio ; extra == 'dev'
-  - pytest-cov ; extra == 'dev'
-  - pytest-socket ; extra == 'dev'
-  - pytest-split ; extra == 'dev'
-  - pytest-timeout ; extra == 'dev'
-  - pytest-xdist ; extra == 'dev'
-  - pytest ; extra == 'dev'
-  - python-gitlab ; extra == 'dev'
-  - ruff ; extra == 'dev'
   requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl
   name: cycler

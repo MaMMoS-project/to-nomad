@@ -16,6 +16,7 @@ python = ">=3.14.3,<3.15"
 mammos-entity = ">=0.14,<0.15"
 pyyaml = ">=6.0"
 hatchling = "*"
+tifffile = "*"
 
 [pypi-dependencies]
 to-nomad = { path = ".", editable = true }
@@ -24,11 +25,11 @@ to-nomad = { path = ".", editable = true }
 # NOT installed for regular users: `pixi install` (default) only creates the
 # default environment; this one is created on first use of `-e nomad-test`.
 [feature.nomad-test.pypi-dependencies]
-nomad-lab = ">=1.4.3,<1.5"
-# nomad/files.py imports zipstream unconditionally, but nomad-lab only
-# declares zipstream-ng under the 'infrastructure' extra.
+# Match the central nomad-lab.eu instance (GET /info -> version 2.0.0,
+# verified 2026-10-22). 2.0.0's base install misses the zipstream
+# dependency and (like 1.4.3) requires fastapi, both added below.
+nomad-lab = ">=2.0,<2.1"
 zipstream-ng = "*"
-# nomad/archive/required.py imports fastapi unconditionally (same reason).
 fastapi = "*"
 
 [feature.nomad-test.tasks]

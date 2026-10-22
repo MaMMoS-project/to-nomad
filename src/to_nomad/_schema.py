@@ -57,6 +57,12 @@ def _nomad_type(value: Any) -> str:
         if arr.dtype == np.bool_:
             return "bool"
         if np.issubdtype(arr.dtype, np.integer):
+            # Scalar integers use the Python type; integer arrays need the
+            # numpy dtype: the metainfo python-int type converts arrays to
+            # lists, which only supports one dimension (nomad data_type.py,
+            # "Python array must be one dimensional").
+            if arr.ndim > 0 and arr.size > 1:
+                return "np.int64"
             return "int"
         if np.issubdtype(arr.dtype, np.floating) or np.issubdtype(
             arr.dtype, np.complexfloating
@@ -121,6 +127,27 @@ def _is_array(value: Any) -> bool:
         return False
 
 
+def _shape_of(value: Any) -> list[str] | None:
+    """Return the NOMAD shape annotation matching the array dimensionality.
+
+    Args:
+        value: An entity-like value.
+
+    Returns:
+        A list of '*' placeholders (one per array dimension), or None for
+        scalar values.
+    """
+    if isinstance(value, str):
+        return None
+    try:
+        arr = np.asanyarray(value)
+    except Exception:
+        return None
+    if arr.ndim > 0 and arr.size > 1:
+        return ["*"] * arr.ndim
+    return None
+
+
 def _to_serializable(value: Any) -> Any:
     """Convert numpy scalars / arrays to plain Python objects for YAML."""
     try:
@@ -149,8 +176,9 @@ def _quantity_def(
         unit = _unit_str(entity_like)
         if unit:
             q["unit"] = unit
-        if _is_array(entity_like.value):
-            q["shape"] = ["*"]
+        shape = _shape_of(entity_like.value)
+        if shape:
+            q["shape"] = shape
 
         # Build a structured description combining ontology info
         desc_parts: list[str] = []
@@ -169,8 +197,9 @@ def _quantity_def(
         if unit:
             q["unit"] = unit
         val = getattr(entity_like, "value", entity_like)
-        if _is_array(val):
-            q["shape"] = ["*"]
+        shape = _shape_of(val)
+        if shape:
+            q["shape"] = shape
 
     elif isinstance(entity_like, str):
         q["type"] = "str"
@@ -189,8 +218,9 @@ def _quantity_def(
         try:
             arr = np.asanyarray(entity_like)
             q["type"] = _nomad_type(arr)
-            if _is_array(arr):
-                q["shape"] = ["*"]
+            shape = _shape_of(arr)
+            if shape:
+                q["shape"] = shape
         except Exception:
             q["type"] = "str"
 
@@ -313,7 +343,8 @@ def _apply_plot_annotations(
             continue
         x = plot.get("x")
         y = plot.get("y")
-        if not x or not y:
+        img = plot.get("img") or plot.get("z")
+        if not ((x and y) or img):
             continue
 
         target = plot.get("target") or ""
@@ -352,15 +383,15 @@ def _apply_plot_annotations(
         y_title = plot.get("y_label") or (f"{y} ({u_y})" if u_y else y)
         title = plot.get("title") or plot.get("label") or f"{y} vs {x}"
         method = plot.get("method", "line")
-        label = plot.get("label", f"{y}({x})")
+        if img and not (x and y):
+            label = plot.get("label", img)
+            x_title = x_title or "x (pixel)"
+            y_title = y_title or "y (pixel)"
+        else:
+            label = plot.get("label", f"{y}({x})")
 
-        x_ref = f"#{target_path}/{x}" if target_path else f"#{x}"
-        y_ref = f"#{target_path}/{y}" if target_path else f"#{y}"
-
-        trace = {
+        trace: dict[str, Any] = {
             "method": method,
-            "x": x_ref,
-            "y": y_ref,
             "label": label,
             "layout": {
                 "title": {"text": title},
@@ -368,6 +399,11 @@ def _apply_plot_annotations(
                 "yaxis": {"title": {"text": y_title}},
             },
         }
+        if img and not (x and y):
+            trace["img"] = f"#{target_path}/{img}" if target_path else f"#{img}"
+        else:
+            trace["x"] = f"#{target_path}/{x}" if target_path else f"#{x}"
+            trace["y"] = f"#{target_path}/{y}" if target_path else f"#{y}"
 
         annotations = entry_section.setdefault("m_annotations", {})
         px_list = annotations.setdefault("plotly_express", [])
@@ -834,9 +870,17 @@ def generate_archive(
                 elif isinstance(entity, me.Entity):
                     continue  # value comes from the HDF file
                 else:
-                    result[_nomad_quantity_name(name)] = _to_serializable(
-                        getattr(entity, "value", entity)
-                    )
+                    # Plain arrays are not inlined: they live in the HDF5
+                    # file and are referenced via m_annotations.hdf5.path.
+                    val = getattr(entity, "value", entity)
+                    try:
+                        is_array = np.asanyarray(val).ndim > 0
+                    except Exception:
+                        is_array = False
+                    if not is_array:
+                        result[_nomad_quantity_name(name)] = _to_serializable(
+                            val
+                        )
             return result
 
         for sub_section_name, sub_col in nested_collections.items():

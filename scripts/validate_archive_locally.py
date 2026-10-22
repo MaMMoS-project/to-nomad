@@ -18,7 +18,10 @@ YAML; the data file (e.g. the .h5) must sit next to it.
 
 import argparse
 import json
+import os
 import sys
+import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from nomad import files
@@ -94,6 +97,49 @@ def _count_hdf_quantities(archive: object) -> tuple[int, int]:
     return filled, empty
 
 
+def _run_with_captured_stderr(func: Callable[[], object]) -> tuple[object, str]:
+    """Run a callable with stderr redirected into a temporary file.
+
+    Args:
+        func: Callable to execute.
+
+    Returns:
+        Tuple of the callable's return value and the captured stderr text.
+        File-descriptor redirection is used so that loggers holding an
+        older reference to sys.stderr are captured as well.
+    """
+    saved_fd = os.dup(2)
+    capture = tempfile.TemporaryFile(mode="w+")
+    try:
+        os.dup2(capture.fileno(), 2)
+        try:
+            result = func()
+        finally:
+            os.dup2(saved_fd, 2)
+            os.close(saved_fd)
+        capture.seek(0)
+        return result, capture.read()
+    finally:
+        capture.close()
+
+
+def _warning_lines(stderr_text: str) -> list[str]:
+    """Extract warning-like lines from captured stderr text.
+
+    Args:
+        stderr_text: Captured stderr output of parse/normalize.
+
+    Returns:
+        List of warning message lines (NOMAD normalizer warnings and
+        Python warnings).
+    """
+    return [
+        line.strip()
+        for line in stderr_text.splitlines()
+        if line.strip() and ("warning" in line.lower() or "(normalizer=" in line)
+    ]
+
+
 def validate(mainfile_path: Path, json_path: Path) -> int:
     """Parse, normalize, and check one archive YAML.
 
@@ -112,11 +158,19 @@ def validate(mainfile_path: Path, json_path: Path) -> int:
     try:
         upload_files.add_rawfiles(upload_dir)
         mainfile_os_path = upload_files.raw_file_object(mainfile).os_path
-        archives = parse(mainfile_os_path, parser_name="parsers/archive")
+
+        def _parse_and_normalize() -> list[object]:
+            """Run parse and normalize in the local staging upload."""
+            parsed = parse(mainfile_os_path, parser_name="parsers/archive")
+            for archive in parsed:
+                _attach_local_upload_context(archive, upload_files)
+                normalize_all(archive)
+                archive.metadata.apply_archive_metadata(archive)  # type: ignore[attr-defined]
+            return parsed
+
+        archives, stderr_text = _run_with_captured_stderr(_parse_and_normalize)
+        warning_list = _warning_lines(stderr_text)
         for archive in archives:
-            _attach_local_upload_context(archive, upload_files)
-            normalize_all(archive)
-            archive.metadata.apply_archive_metadata(archive)  # type: ignore[attr-defined]
             report = archive.m_to_dict()  # type: ignore[attr-defined]
             figures = report.get("data", {}).get("figures", [])
             filled, empty = _count_hdf_quantities(archive)
@@ -129,17 +183,28 @@ def validate(mainfile_path: Path, json_path: Path) -> int:
                 for trace in figure.get("figure", {}).get("data", []):
                     x = trace.get("x")
                     y = trace.get("y")
-                    ok = bool(x) and bool(y)
+                    z = trace.get("z")
+                    ok = (bool(x) and bool(y)) or bool(z)
                     if not ok:
                         failures += 1
                     print(
                         f"  trace: x values: {len(x) if x else 0}, "
-                        f"y values: {len(y) if y else 0}"
+                        f"y values: {len(y) if y else 0}, "
+                        f"z values: {len(z) if z else 0}"
                         + ("" if ok else "  <-- EMPTY")
                     )
             with open(json_path, "w") as f:
                 json.dump(report, f, indent=2, default=str)
             print(f"  normalized archive: {json_path}")
+            print(f"  warnings ({len(warning_list)}):")
+            counts: dict[str, int] = {}
+            for line in warning_list:
+                counts[line] = counts.get(line, 0) + 1
+            if counts:
+                for line, count in counts.items():
+                    print(f"    [{count}x] {line}" if count > 1 else f"    {line}")
+            else:
+                print("    none")
     finally:
         try:
             upload_files.delete()
