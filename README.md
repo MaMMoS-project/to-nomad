@@ -278,6 +278,70 @@ sample = me.EntityCollection(description="Sample", intrinsic=sub)
 
 See `examples/from_nested_collection.py` for a runnable demonstration.
 
+## Plotting x-y curves in NOMAD
+
+NOMAD does not render an x-y curve merely because two arrays exist in an
+HDF5 file. Two declarative elements are required in the NOMAD archive
+YAML, and `to_nomad(..., plots=[...])` generates both:
+
+1. The **entry (root) section** inherits from
+   `nomad.datamodel.metainfo.plot.PlotSection` and carries a
+   `plotly_express` annotation referencing the two quantities as x and y.
+   `PlotSection` is listed **before** the data-filling base section
+   (`HDF5Normalizer`): otherwise the figures are created before the HDF5
+   data is read and the plot stays empty (nomad-FAIR issue #2717).
+2. Quantities inside sub-sections are referenced by data path, e.g.
+   `#magnetization_curve/H` for a sub-collection `magnetization_curve`.
+
+Each entry in `plots` is a dict:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `x`, `y` | Quantity names (required) | — |
+| `target` | Dotted sub-section path containing the quantities; empty = entry section | `""` |
+| `label` | Trace label | `f"{y}({x})"` |
+| `title` | Plot title | `label` |
+| `x_label`, `y_label` | Axis titles | `f"{name} ({unit})"` |
+| `method` | plotly.express method | `"line"` |
+
+Axis titles automatically include the quantity units.
+
+For HDF inputs the referenced HDF5 groups are additionally tagged with
+NeXus `NXdata` attributes (`signal`, `axes`, `units`), so the curve also
+renders in the H5Web file preview of the NOMAD upload.
+
+```python
+to_nomad.to_nomad(
+    h5_path,
+    yaml_path,
+    hdf_reference_mode=True,
+    plots=[{"target": "magnetization_curve", "x": "H", "y": "M", "label": "M(H)"}],
+)
+```
+
+Runnable examples: `examples/from_curve_plot_simple.py` (single sample)
+and `examples/from_curve_plot_advanced.py` (several nested samples, one
+figure per sample).
+
+## Local validation (optional)
+
+Generated archives can be validated offline against the real NOMAD
+parser and normalizer chain (including `HDF5Normalizer` and
+`PlotSection`) before uploading. The `nomad-test` environment is opt-in —
+regular users never install `nomad-lab`:
+
+```bash
+pixi run -e nomad-test validate examples/output/simple_curve.archive.yaml
+```
+
+The command reports the number of filled HDF5-referenced quantities and
+the x/y value counts of every declared figure, exits non-zero on empty
+values, and writes the full normalized archive as
+`<stem>.validated.json` next to the archive for inspection
+(`--json PATH` overrides the destination). Upload the `.archive.yaml`
+together with its data file, and validate locally first: what validates
+here is exactly what NOMAD will process.
+
 ## API
 
 | Function / class | Description |
@@ -336,7 +400,11 @@ Note: NOMAD `HDF5Normalizer` supports extensions like `.h5` and `.hdf5` (not
 ## Examples
 
 - [examples/quickstart.py](examples/quickstart.py) – basic non-interactive usage.
-- More examples are in [examples/output/](examples/output/) after running `pixi run example`.
+- [examples/from_mammos_files.py](examples/from_mammos_files.py) – file-based conversion from MaMMoS YAML/CSV/HDF.
+- [examples/from_nested_collection.py](examples/from_nested_collection.py) – nested EntityCollections in HDF reference mode.
+- [examples/from_curve_plot_simple.py](examples/from_curve_plot_simple.py) – single M(H) curve plotted in NOMAD (overview plot + H5Web preview).
+- [examples/from_curve_plot_advanced.py](examples/from_curve_plot_advanced.py) – several nested samples, one plot per sample.
+- More examples are in [examples/output/](examples/output/) after running the individual scripts.
 
 ## Acknowledgements
 
