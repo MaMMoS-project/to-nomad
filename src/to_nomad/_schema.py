@@ -293,6 +293,87 @@ def _apply_hdf_quantity_annotations(
         section_quantities[qname] = merged
 
 
+def _apply_plot_annotations(
+    entry_section: dict[str, Any],
+    plots: list[dict[str, Any]],
+) -> None:
+    """Inject PlotSection base section and plotly_express annotations.
+
+    The annotation is attached to the entry (root) section, with PlotSection
+    listed before the data-filling base section (HDF5Normalizer): otherwise
+    the plotly figures are created before the HDF data is read and the plot
+    stays empty (nomad-FAIR issue #2717). Quantities inside a target
+    sub-section are referenced with the '#' prefix and a slash-separated
+    data path (e.g. ``#magnetization_curve/H``).
+    """
+    plot_base = "nomad.datamodel.metainfo.plot.PlotSection"
+
+    for plot in plots:
+        if not isinstance(plot, dict):
+            continue
+        x = plot.get("x")
+        y = plot.get("y")
+        if not x or not y:
+            continue
+
+        target = plot.get("target") or ""
+        target_sec = entry_section
+        target_path = ""
+        if target:
+            # Support nested dotted paths (e.g. "material.magnetization_curve")
+            parts = target.split(".")
+            curr = entry_section
+            found = True
+            for part in parts:
+                sub_secs = curr.get("sub_sections", {})
+                if part in sub_secs and "section" in sub_secs[part]:
+                    curr = sub_secs[part]["section"]
+                else:
+                    found = False
+                    break
+            if found:
+                target_sec = curr
+                target_path = "/".join(parts)
+
+        base = list(entry_section.get("base_sections", []))
+        if plot_base not in base:
+            idx = next(
+                (i for i, b in enumerate(base) if "HDF5Normalizer" in b), len(base)
+            )
+            base.insert(idx, plot_base)
+            entry_section["base_sections"] = base
+
+        q_x = target_sec.get("quantities", {}).get(x, {})
+        q_y = target_sec.get("quantities", {}).get(y, {})
+        u_x = q_x.get("unit")
+        u_y = q_y.get("unit")
+
+        x_title = plot.get("x_label") or (f"{x} ({u_x})" if u_x else x)
+        y_title = plot.get("y_label") or (f"{y} ({u_y})" if u_y else y)
+        title = plot.get("title") or plot.get("label") or f"{y} vs {x}"
+        method = plot.get("method", "line")
+        label = plot.get("label", f"{y}({x})")
+
+        x_ref = f"#{target_path}/{x}" if target_path else f"#{x}"
+        y_ref = f"#{target_path}/{y}" if target_path else f"#{y}"
+
+        trace = {
+            "method": method,
+            "x": x_ref,
+            "y": y_ref,
+            "label": label,
+            "layout": {
+                "title": {"text": title},
+                "xaxis": {"title": {"text": x_title}},
+                "yaxis": {"title": {"text": y_title}},
+            },
+        }
+
+        annotations = entry_section.setdefault("m_annotations", {})
+        px_list = annotations.setdefault("plotly_express", [])
+        px_list.append(trace)
+
+
 def generate_archive(
     data: mammos_entity.EntityCollection | mammos_entity.Entity,
     *,
@@ -318,6 +399,7 @@ def generate_archive(
     nomad_generation_metadata: dict[str, Any] | None = None,
     include_ontology_in_yaml: bool = True,
     map_collection_with_ontology: bool = False,
+    plots: list[dict[str, Any]] | None = None,
 ) -> dict:
     """Generate a NOMAD archive dictionary from mammos-entity data.
 
@@ -397,6 +479,10 @@ def generate_archive(
             labels will automatically have an ``ontology_reference`` Entity added
             with value 1. When enabled, warnings are emitted for descriptions that
             do not match any ontology label. Default is ``False``.
+        plots:
+            Optional list of x-y plot declarations attached to the entry
+            section as ``plotly_express`` annotations (see
+            :func:`to_nomad.to_nomad` for the entry format).
 
     Returns:
         A nested dictionary ready for YAML serialization in NOMAD archive
@@ -661,6 +747,9 @@ def generate_archive(
         _apply_hdf_quantity_annotations(
             definitions["sections"][section_name], hdf_quantity_annotations
         )
+
+    if plots:
+        _apply_plot_annotations(definitions["sections"][section_name], plots)
 
     # ------------------------------------------------------------------
     # Build the data block.

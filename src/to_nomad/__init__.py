@@ -67,7 +67,7 @@ import json
 from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from to_nomad._io import create_upload_zip, save_archive_yaml
 from to_nomad._prompt import collect_metadata
@@ -186,6 +186,51 @@ def _hdf_dataset_paths(path: str | Path) -> set[str]:
     return out
 
 
+def _apply_nexus_plot_attributes(
+    h5_path: Path,
+    plots: list[dict[str, Any]],
+) -> None:
+    """Apply NeXus NXdata attributes to HDF5 groups so H5Web renders them as plots."""
+    try:
+        import h5py
+
+        with h5py.File(h5_path, "a") as f:
+            for plot in plots:
+                if not isinstance(plot, dict):
+                    continue
+                x = plot.get("x")
+                y = plot.get("y")
+                if not x or not y:
+                    continue
+
+                target = plot.get("target") or ""
+                # Convert dotted path like "material.magnetization_curve" to "/material/magnetization_curve"
+                path_parts = [p for p in target.replace(".", "/").split("/") if p]
+                group_path = "/" + "/".join(path_parts) if path_parts else "/"
+
+                if group_path in f:
+                    grp = f[group_path]
+                    if isinstance(grp, h5py.Group):
+                        grp.attrs["NX_class"] = "NXdata"
+                        grp.attrs["signal"] = y
+                        grp.attrs["axes"] = [x]
+                        if (
+                            x in grp
+                            and "unit" in grp[x].attrs
+                            and "units" not in grp[x].attrs
+                        ):
+                            grp[x].attrs["units"] = grp[x].attrs["unit"]
+                        if (
+                            y in grp
+                            and "unit" in grp[y].attrs
+                            and "units" not in grp[y].attrs
+                        ):
+                            grp[y].attrs["units"] = grp[y].attrs["unit"]
+    except Exception:
+        pass
+
+
+
 def _infer_mammos_csv_header_row(
     path: str | Path,
     expected_names: list[str],
@@ -237,6 +282,7 @@ def to_nomad(
     include_nomad_generation_metadata: bool = True,
     include_ontology_in_yaml: bool | None = None,
     map_collection_with_ontology: bool = False,
+    plots: list[dict[str, Any]] | None = None,
     **metadata: str,
 ) -> Path:
     """Convert mammos-entity data to a NOMAD-compatible ``.archive.yaml`` file.
@@ -333,6 +379,15 @@ def to_nomad(
             labels will automatically have an ``ontology_reference`` Entity added
             with value 1. When enabled, warnings are emitted for descriptions that
             do not match any ontology label. Default is ``False``.
+        plots:
+            Optional list of x-y plot declarations. Each entry is a dict with
+            keys ``x`` and ``y`` (quantity names), optional ``target`` (dotted
+            sub-section path containing the quantities, default: the entry
+            section), ``label``, ``title``, ``x_label``, ``y_label`` and
+            ``method`` (default ``line``). For HDF inputs, the referenced HDF5
+            groups are tagged with NeXus ``NXdata`` attributes for the H5Web
+            file preview, and the entry section gains ``PlotSection`` with a
+            ``plotly_express`` annotation for the overview plot.
 
         **metadata:
             Pre-filled metadata fields.  All keyword arguments are passed
@@ -764,8 +819,12 @@ def to_nomad(
         },
         include_ontology_in_yaml=include_ontology_in_yaml,
         map_collection_with_ontology=map_collection_with_ontology,
+        plots=plots,
         **schema_kwargs,
     )
+
+    if plots and source_path and source_suffix in normalizer_suffixes:
+        _apply_nexus_plot_attributes(source_path, plots)
 
     # Write to file
     out_path = save_archive_yaml(archive, output)
