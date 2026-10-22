@@ -297,14 +297,18 @@ Each entry in `plots` is a dict:
 
 | Key | Meaning | Default |
 |---|---|---|
-| `x`, `y` | Quantity names (required) | — |
+| `x`, `y` | Quantity names (required for curve plots) | — |
+| `img` or `z` | Quantity name for image plots (used instead of `x`/`y`) | — |
 | `target` | Dotted sub-section path containing the quantities; empty = entry section | `""` |
 | `label` | Trace label | `f"{y}({x})"` |
 | `title` | Plot title | `label` |
 | `x_label`, `y_label` | Axis titles | `f"{name} ({unit})"` |
 | `method` | plotly.express method | `"line"` |
 
-Axis titles automatically include the quantity units.
+Axis titles automatically include the quantity units. Image plots: pass
+`img` (or `z`) with a 2-D quantity and a `method` such as `imshow`; the
+image is rendered from the HDF-referenced array (see
+`examples/from_sem_image.py`).
 
 For HDF inputs the referenced HDF5 groups are additionally tagged with
 NeXus `NXdata` attributes (`signal`, `axes`, `units`), so the curve also
@@ -404,6 +408,7 @@ Note: NOMAD `HDF5Normalizer` supports extensions like `.h5` and `.hdf5` (not
 - [examples/from_nested_collection.py](examples/from_nested_collection.py) – nested EntityCollections in HDF reference mode.
 - [examples/from_curve_plot_simple.py](examples/from_curve_plot_simple.py) – single M(H) curve plotted in NOMAD (overview plot + H5Web preview).
 - [examples/from_curve_plot_advanced.py](examples/from_curve_plot_advanced.py) – several nested samples, one plot per sample.
+- [examples/from_sem_image.py](examples/from_sem_image.py) – SEM micrograph (2-D image) referenced from HDF5: overview imshow plot + NeXus H5Web preview.
 - More examples are in [examples/output/](examples/output/) after running the individual scripts.
 
 ## Acknowledgements
