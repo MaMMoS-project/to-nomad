@@ -501,6 +501,7 @@ Note: NOMAD `HDF5Normalizer` supports extensions like `.h5` and `.hdf5` (not
 - [examples/from_curve_plot_advanced.py](examples/from_curve_plot_advanced.py) – several nested samples, one plot per sample.
 - [examples/from_sem_image.py](examples/from_sem_image.py) – SEM micrograph (2-D image) referenced from HDF5: overview imshow plot + NeXus H5Web preview.
 - [examples/from_cif_structure.py](examples/from_cif_structure.py) – CIF crystal structure shipped in the upload: 3-D structure preview in the overview, next to HDF-referenced entities.
+- [examples/from_sample_collection.py](examples/from_sample_collection.py) – three nested samples, each with an M(H) curve and an SEM micrograph (one figure each), plus a shared inline structure preview.
 - [examples/upload_example.py](examples/upload_example.py) – safe API upload of generated files (dry-run, no token needed).
 - More examples are in [examples/output/](examples/output/) after running the individual scripts.
 
