@@ -342,7 +342,15 @@ wires this up for a crystal-structure file shipped in the same upload:
 > serves as raw data (provenance and download) only. The local parse is a
 > deliberate workaround: the `ElnWithStructureFile` base section, which
 > would parse the file server-side, fails deterministically on nomad-lab
-> 2.0.0 (`AttributeError: qualified_name`).
+> 2.0.0 (`AttributeError: qualified_name`). The root cause is proven at
+> source level (the normalizer chain stores a direct `atoms_ref`
+> reference into a temporary run section that `ElnWithStructureFile`
+> then deletes, which breaks serialization); as of 2026-10-23 the bug is
+> unfixed on the develop branch and unreported upstream. An upstream
+> report draft is prepared, and the local-parse workaround matches the
+> direction the NOMAD maintainers chose in nomad-FAIR issue #2250
+> (build the structure viewer from a System section in the archive
+> instead of parsing CIF files server-side).
 
 - the structure file is parsed **locally with ASE** and embedded as an
   inline top-level `run` section in the `.archive.yaml` (positions and
