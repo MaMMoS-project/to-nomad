@@ -375,6 +375,14 @@ Note: the `ElnWithStructureFile` base section is deliberately not used —
 entries using it fail deterministically on nomad-lab 2.0.0 during
 archive persistence (`AttributeError: qualified_name`).
 
+GUI trade-off (new NOMAD interface): the structure preview requires the
+`dft` domain, and dft-domain entries render the DFT-style Overview —
+which shows the Material/structure card but does **not** include the
+generic Figures card. Figures of structure-bearing archives are
+reachable under Archive → Data → Figures. Archives *without* a
+structure render their figures in the Overview instead — choose per
+archive which presentation matters more.
+
 ## Uploading via the API
 
 `to_nomad.upload_to_nomad` uploads existing files into an existing

@@ -23,6 +23,14 @@ No ``chemical_formula`` is passed: with an inline run section the
 server-side chain derives the composition from the structure itself
 (a formula would collide with it, see the repository README).
 
+GUI trade-off (new NOMAD interface): the structure preview requires
+``domain: dft``, and dft-domain entries render the DFT-style Overview —
+which shows the Material/structure card but does NOT include the
+generic Figures card. The 6 figures remain reachable under
+Archive -> Data -> Figures. Archives WITHOUT a structure render their
+figures in the Overview instead. Choose per archive which presentation
+matters more.
+
 The image values are exemplar data (same published SEM micrograph for
 all three samples); the entity values are exemplar values.
 
