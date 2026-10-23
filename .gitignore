@@ -208,3 +208,9 @@ __marimo__/
 
 # Generated example outputs
 examples/output/
+
+# Local documentation
+local_docs/
+
+# Rules for agents
+AGENTS.md
