@@ -1,6 +1,7 @@
 """Example: structure preview from a CIF file plus an ME collection.
 
-The published Co2Fe2H4 structure (``examples/input/Co2Fe2H4_structure.cif``,
+The published Co2Fe2H4 structure
+(``examples/input/cif_structure_Co2Fe2H4.cif``,
 from the ``MaMMoS_DFT_MC_Atomistic+Spindynamic-calculations_UU`` upload on
 the central NOMAD instance) is combined with an EntityCollection of
 ontology-backed quantities:
@@ -33,7 +34,7 @@ import to_nomad
 out_dir = Path(__file__).parent / "output"
 out_dir.mkdir(exist_ok=True)
 
-cif_path = Path(__file__).parent / "input" / "Co2Fe2H4_structure.cif"
+cif_path = Path(__file__).parent / "input" / "cif_structure_Co2Fe2H4.cif"
 
 # Ontology-backed sample properties stored next to the structure.
 # NOTE: the values below are exemplar values for demonstration purposes,

@@ -30,7 +30,7 @@ project_id = "your-project-id-here"
 files = [
     out_dir / "cif_structure.archive.yaml",
     out_dir / "cif_structure.h5",
-    out_dir / "Co2Fe2H4_structure.cif",
+    out_dir / "cif_structure_Co2Fe2H4.cif",
 ]
 existing = [path for path in files if path.is_file()]
 if not existing:

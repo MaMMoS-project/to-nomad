@@ -24,7 +24,7 @@ grayscale, uncompressed TIFF (1.6 MB).
   NOMAD archive YAML + HDF5 (see the repository README, section
   "Plotting x-y curves in NOMAD").
 
-## Co2Fe2H4_structure.cif
+## cif_structure_Co2Fe2H4.cif
 
 Crystal structure of Co2Fe2H4 (hexagonal, space group P6_3/mmc, 10 atoms
 per unit cell), exported with VESTA; CIF text, 1.5 KB.
