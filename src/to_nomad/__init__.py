@@ -64,6 +64,7 @@ Quick-start example
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
 from pathlib import Path
@@ -266,6 +267,49 @@ def _safe_to_nomad_version() -> str:
     return __version__
 
 
+def _structure_run_section(structure_path: Path) -> dict[str, Any]:
+    """Parse a structure file with ASE into a NOMAD run-section dict.
+
+    The returned dict has the metainfo YAML shape of an archive ``run``
+    entry: one program (provenance) and one system whose ``atoms``
+    carry lattice_vectors, labels, positions, periodic and species.
+    Values are converted to the runschema base unit (meter) so the
+    plain numbers in the YAML are interpreted correctly.
+
+    Args:
+        structure_path: Path of the structure file (e.g. a CIF).
+
+    Returns:
+        Dict with 'program' and 'system' keys for the archive 'run'.
+
+    Raises:
+        ImportError: If the optional 'ase' dependency is missing.
+        Exception: If ASE cannot parse the file.
+    """
+    from ase.io import read
+
+    structure = read(str(structure_path))
+    angstrom_to_meter = 1e-10
+    return {
+        "program": {"name": "Structure File Importer"},
+        "system": [
+            {
+                "atoms": {
+                    "lattice_vectors": (
+                        structure.get_cell()[:] * angstrom_to_meter
+                    ).tolist(),
+                    "labels": list(structure.get_chemical_symbols()),
+                    "positions": (
+                        structure.get_positions() * angstrom_to_meter
+                    ).tolist(),
+                    "periodic": [bool(p) for p in structure.get_pbc()],
+                    "species": [int(z) for z in structure.get_atomic_numbers()],
+                }
+            }
+        ],
+    }
+
+
 def to_nomad(
     data: mammos_entity.EntityCollection | mammos_entity.Entity | str | Path,
     output: str | Path = "output.archive.yaml",
@@ -284,6 +328,7 @@ def to_nomad(
     include_ontology_in_yaml: bool | None = None,
     map_collection_with_ontology: bool = False,
     plots: list[dict[str, Any]] | None = None,
+    structure_file: str | Path | None = None,
     **metadata: str,
 ) -> Path:
     """Convert mammos-entity data to a NOMAD-compatible ``.archive.yaml`` file.
@@ -389,6 +434,23 @@ def to_nomad(
             groups are tagged with NeXus ``NXdata`` attributes for the H5Web
             file preview, and the entry section gains ``PlotSection`` with a
             ``plotly_express`` annotation for the overview plot.
+        structure_file:
+            Optional path to a crystal-structure file (e.g. a ``.cif``)
+            shipped in the same upload. The file is copied next to the
+            generated ``.archive.yaml`` (and included in the upload zip
+            when ``create_zip=True``), parsed locally with ASE, and
+            embedded as an inline top-level ``run`` section in the
+            archive. The standard NOMAD normalizer chain
+            (Optimade/Results/Metainfo) then populates the
+            material/optimade results server-side, so the entry
+            overview shows a 3-D structure preview. The
+            ``ElnWithStructureFile`` base section is deliberately NOT
+            used: it fails deterministically on nomad-lab 2.0.0 during
+            archive persistence (``AttributeError: qualified_name``).
+            Note that NOMAD does not re-read the structure file at
+            upload time: the preview data is fixed when the archive
+            is generated — regenerate the archive after changing the
+            file.
 
         **metadata:
             Pre-filled metadata fields.  All keyword arguments are passed
@@ -800,6 +862,31 @@ def to_nomad(
             hdf_meta_for_json, ensure_ascii=False
         )
 
+    copied_structure_file: Path | None = None
+    structure_run_section: dict[str, Any] | None = None
+    if structure_file is not None:
+        structure_source = Path(structure_file)
+        if not structure_source.is_file():
+            raise FileNotFoundError(f"structure_file not found: {structure_source}")
+        # Copy next to the archive so the local directory mirrors the
+        # upload layout; the file ships as raw data (provenance and
+        # download fallback).
+        out_dir = Path(output).resolve().parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        copied_structure_file = out_dir / structure_source.name
+        shutil.copyfile(structure_source, copied_structure_file)
+        # Parse locally with ASE and embed the structure as an inline
+        # top-level run section: the standard NOMAD normalizer chain
+        # populates the structure-preview data server-side. The
+        # ElnWithStructureFile base section is NOT used (it fails on
+        # nomad-lab 2.0.0 with 'AttributeError: qualified_name').
+        structure_run_section = _structure_run_section(structure_source)
+        extra_quantities["structure_file"] = {
+            "type": "str",
+            "description": "Structure file shipped with this entry (upload-relative name).",
+        }
+        extra_data["structure_file"] = copied_structure_file.name
+
     archive = generate_archive(
         data,
         extra_quantities=extra_quantities or None,
@@ -824,6 +911,17 @@ def to_nomad(
         **schema_kwargs,
     )
 
+    if structure_run_section is not None:
+        archive["run"] = [structure_run_section]
+        # The archive parser adopts the domain from the archive's own
+        # metadata block (nomad/parsing/parser.py, ArchiveParser):
+        # the server-side normalizer filter then runs the
+        # domain='dft' OptimadeNormalizer, which populates
+        # metadata.optimade from the inline run (the structure preview
+        # data). Without this block the parser domain stays None and
+        # the OptimadeNormalizer is skipped.
+        archive["metadata"] = {"domain": "dft"}
+
     if plots and source_path and source_suffix in normalizer_suffixes:
         _apply_nexus_plot_attributes(source_path, plots)
 
@@ -844,6 +942,8 @@ def to_nomad(
         files_to_zip: list[Path] = [out_path]
         if zip_data_files:
             files_to_zip.extend(Path(f) for f in zip_data_files)
+        if copied_structure_file is not None:
+            files_to_zip.append(copied_structure_file)
 
         create_upload_zip(*files_to_zip, output_path=zip_path)
         print(f"Upload zip created:      {zip_path}")

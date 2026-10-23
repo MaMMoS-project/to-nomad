@@ -44,6 +44,32 @@ class _LocalUpload:
         self.upload_id = upload_files.upload_id  # type: ignore[attr-defined]
 
 
+def _archive_domain(mainfile_os_path: str) -> str | None:
+    """Read the domain from the archive YAML's metadata block, if any.
+
+    The server-side archive parser adopts this value as the parser
+    domain and the normalizer chain is filtered against it; the local
+    ``normalize_all()`` call instead filters on
+    ``archive.metadata.domain``. Setting the same value here makes the
+    local chain mirror the server's filtering (in particular it lets
+    the domain='dft' OptimadeNormalizer run for inline-run archives).
+
+    Args:
+        mainfile_os_path: Path of the .archive.yaml inside the staging
+            upload.
+
+    Returns:
+        The domain string, or None if the archive has no metadata
+        block or no domain.
+    """
+    import yaml
+
+    with open(mainfile_os_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    metadata = data.get("metadata") or {}
+    return metadata.get("domain")
+
+
 def _attach_local_upload_context(archive: object, upload_files: object) -> None:
     """Give the archive a server-like context pointing at the staging upload.
 
@@ -161,9 +187,12 @@ def validate(mainfile_path: Path, json_path: Path) -> int:
 
         def _parse_and_normalize() -> list[object]:
             """Run parse and normalize in the local staging upload."""
+            domain = _archive_domain(mainfile_os_path)
             parsed = parse(mainfile_os_path, parser_name="parsers/archive")
             for archive in parsed:
                 _attach_local_upload_context(archive, upload_files)
+                if domain and archive.metadata:
+                    archive.metadata.domain = domain
                 normalize_all(archive)
                 archive.metadata.apply_archive_metadata(archive)  # type: ignore[attr-defined]
             return parsed

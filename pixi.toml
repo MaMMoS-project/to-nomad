@@ -10,6 +10,8 @@ version = "0.1.1"
 install = "pip install -e . --no-deps"
 # Quick smoke-test: generate a sample archive YAML and print it.
 example = "python examples/quickstart.py"
+# Safe NOMAD API upload (dry-run by default; --yes for the real transfer).
+upload = "python -m to_nomad.upload_to_nomad"
 
 [dependencies]
 python = ">=3.14.3,<3.15"
@@ -17,6 +19,7 @@ mammos-entity = ">=0.14,<0.15"
 pyyaml = ">=6.0"
 hatchling = "*"
 tifffile = "*"
+ase = "*"
 
 [pypi-dependencies]
 to-nomad = { path = ".", editable = true }
@@ -31,6 +34,11 @@ to-nomad = { path = ".", editable = true }
 nomad-lab = ">=2.0,<2.1"
 zipstream-ng = "*"
 fastapi = "*"
+# Provides the 'RunSchema' nomad.plugin entry point. Without it,
+# nomad.datamodel.metainfo.runschema stays None and the
+# ElnWithStructureFile base section (structure_file / CIF preview)
+# crashes with "'NoneType' object has no attribute 'run'".
+nomad-schema-plugin-run = "*"
 
 [feature.nomad-test.tasks]
 parse = "nomad parse --parser parsers/archive --show-archive"

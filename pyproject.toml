@@ -16,6 +16,7 @@ dependencies = [
     "mammos-entity>=0.14,<0.15",
     "pyyaml>=6.0",
     "numpy",
+    "ase",
 ]
 
 [project.optional-dependencies]
