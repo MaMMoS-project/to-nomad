@@ -327,12 +327,103 @@ Runnable examples: `examples/from_curve_plot_simple.py` (single sample)
 and `examples/from_curve_plot_advanced.py` (several nested samples, one
 figure per sample).
 
+## Structure preview from a CIF file
+
+NOMAD renders a 3-D structure preview in the entry overview when the
+material/optimade results are populated. `to_nomad(..., structure_file=...)`
+wires this up for a crystal-structure file shipped in the same upload:
+
+> **Important:** NOMAD never reads the `.cif` at upload time. The structure
+> shown in the overview is the one that `to_nomad(..., structure_file=...)`
+> parsed **locally** and embedded into the `.archive.yaml` when the archive
+> was generated. If you change the `.cif` and re-upload only the `.cif`,
+> the preview will **not** change — regenerate the archive (rerun
+> `to_nomad`) so the updated structure is embedded. The `.cif` in the upload
+> serves as raw data (provenance and download) only. The local parse is a
+> deliberate workaround: the `ElnWithStructureFile` base section, which
+> would parse the file server-side, fails deterministically on nomad-lab
+> 2.0.0 (`AttributeError: qualified_name`).
+
+- the structure file is parsed **locally with ASE** and embedded as an
+  inline top-level `run` section in the `.archive.yaml` (positions and
+  lattice vectors converted to the NOMAD base unit meter),
+- the archive declares `metadata: {domain: dft}` so the server-side
+  normalizer chain includes the `OptimadeNormalizer`, which populates
+  `metadata.optimade` (sites, lattice, species) from the inline run —
+  the data the GUI renders as the structure viewer,
+- the file is copied next to the generated `.archive.yaml` (mirroring
+  the upload layout) and included in the zip when `create_zip=True`,
+  and the `structure_file` data field records its upload-relative
+  name.
+
+```python
+to_nomad.to_nomad(
+    h5_path,
+    yaml_path,
+    hdf_reference_mode=True,
+    structure_file="path/to/structure.cif",
+)
+```
+
+The `.cif` should be uploaded together with the archive YAML (same zip
+or directory) as raw data (provenance and download fallback). See
+`examples/from_cif_structure.py` for a runnable demo that combines a
+published Co2Fe2H4 structure with an EntityCollection of ontology-backed
+properties.
+
+Note: the `ElnWithStructureFile` base section is deliberately not used —
+entries using it fail deterministically on nomad-lab 2.0.0 during
+archive persistence (`AttributeError: qualified_name`).
+
+## Uploading via the API
+
+`to_nomad.upload_to_nomad` uploads existing files into an existing
+NOMAD project (upload) via the REST API, safely by default:
+
+- **Dry-run by default:** prints the plan (files with sizes and
+  SHA-256 checksums, target project, API URL) with **zero network
+  access**; the real transfer requires `--yes`.
+- **Explicit target:** `--project-id` is mandatory; the project must
+  be yours and unpublished (published projects are read-only for the
+  tool). Existing server-side files are never overwritten without
+  `--allow-overwrite`.
+- **Scope-limited token:** authenticate with a personal access token
+  (PAT) created in the GUI (Settings → User Settings → Tokens) with
+  exactly the scopes `uploads:read` + `uploads:write` — such a token
+  can upload but **cannot publish** (publishing needs the separate
+  scope `uploads:publish`; scope checks are enforced server-side).
+- **Token handling:** the token is read only from the environment
+  variable `NOMAD_CLIENT_ACCESS_TOKEN` or a file outside the
+  repository (`~/.config/to_nomad/token`, `chmod 600`); never from a
+  command-line argument, never logged.
+- **Verification:** after the transfer the tool can wait for
+  server-side processing (`--wait`) and reports per-entry
+  `process_status` and errors; a read-only status check is available
+  via `--status`.
+- **No destructive endpoints:** the tool implements no delete,
+  publish or metadata-edit calls.
+
+```bash
+pixi run upload <files...> --project-id <id>            # dry-run (default)
+pixi run upload <files...> --project-id <id> --yes      # real upload
+pixi run upload <files...> --project-id <id> --yes --wait   # + processing report
+pixi run upload --project-id <id> --status              # read-only status
+```
+
+See `examples/upload_example.py` for the programmatic API (dry-run,
+no token needed). Large uploads are streamed with constant memory
+and a configurable socket timeout (no total-time cap).
+
 ## Local validation (optional)
 
 Generated archives can be validated offline against the real NOMAD
 parser and normalizer chain (including `HDF5Normalizer` and
 `PlotSection`) before uploading. The `nomad-test` environment is opt-in —
-regular users never install `nomad-lab`:
+regular users never install `nomad-lab`. Note for `structure_file`
+entries: nomad-lab 2.0.0 loads the run schema from the `RunSchema`
+plugin entry point, so the environment includes
+`nomad-schema-plugin-run`; without it, `ElnWithStructureFile` fails with
+`'NoneType' object has no attribute 'run'`:
 
 ```bash
 pixi run -e nomad-test validate examples/output/simple_curve.archive.yaml
@@ -409,6 +500,8 @@ Note: NOMAD `HDF5Normalizer` supports extensions like `.h5` and `.hdf5` (not
 - [examples/from_curve_plot_simple.py](examples/from_curve_plot_simple.py) – single M(H) curve plotted in NOMAD (overview plot + H5Web preview).
 - [examples/from_curve_plot_advanced.py](examples/from_curve_plot_advanced.py) – several nested samples, one plot per sample.
 - [examples/from_sem_image.py](examples/from_sem_image.py) – SEM micrograph (2-D image) referenced from HDF5: overview imshow plot + NeXus H5Web preview.
+- [examples/from_cif_structure.py](examples/from_cif_structure.py) – CIF crystal structure shipped in the upload: 3-D structure preview in the overview, next to HDF-referenced entities.
+- [examples/upload_example.py](examples/upload_example.py) – safe API upload of generated files (dry-run, no token needed).
 - More examples are in [examples/output/](examples/output/) after running the individual scripts.
 
 ## Acknowledgements
