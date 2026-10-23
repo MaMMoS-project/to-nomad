@@ -61,7 +61,13 @@ to_nomad.to_nomad(
     lab_id="DEMO-CIF-001",
     name="Co2Fe2H4 Structure Demo",
     description="Structure preview from a CIF file with HDF-referenced entities.",
-    chemical_formula="Co2Fe2H4",
+    # No chemical_formula here: with an inline run section the server-side
+    # chain derives the composition from the structure itself. Passing
+    # chemical_formula would add the Chemical base section, whose
+    # formula-derived composition collides with the system-derived one
+    # ("Could not populate compositional data as elements is already
+    # defined", logged as ERROR by the results chain, and the entry
+    # loses structural_type/dimensionality).
     hdf_reference_mode=True,
     structure_file=cif_path,
 )
