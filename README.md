@@ -32,6 +32,25 @@ For further information on the ontology and its use-case with mammos-entity see 
   include a `mammos_entities` subsection with per-quantity metadata (`name`,
   `ontology_label`, `ontology_iri`, `unit`, `description`, `source_type`).
 
+## Terminology: two kinds of YAML
+
+This package deals with two distinct YAML formats — do not confuse them:
+
+| | NOMAD archive YAML | mammos-entity collection YAML |
+|---|---|---|
+| Typical filename | `*.archive.yaml` | `*.yaml` / `*.yml` |
+| Role | Upload artifact for NOMAD: `definitions` (schema) + `data` (entry values). Uploaded in parallel to the raw data files, but can hold values inline. | MaMMoS *data file* written by `EntityCollection.to_yaml` and read with `mammos_entity.from_yaml`. An **input** to `to-nomad`, never a NOMAD artifact. |
+| Created by | `to_nomad.to_nomad(...)` | `mammos_entity` itself |
+
+**NOMAD upload package composition.** A NOMAD upload consists of the
+`*.archive.yaml` plus its raw data files. With `hdf_reference_mode=True`
+(the `HDF5Normalizer` workflow), the data file is always an HDF file
+(`.h5`/`.hdf5`) written by `EntityCollection.to_hdf5` — never a
+mammos-entity collection YAML data file. A `*.yaml` written by
+`EntityCollection.to_yaml` is an intermediate input to
+`to_nomad.to_nomad(...)` only: it cannot be uploaded as the data file next
+to an `.archive.yaml`.
+
 ## Installation
 
 ```bash
@@ -164,6 +183,276 @@ data:
   …
 ```
 
+## Name and Unit Normalization (MaMMoS / Astropy → NOMAD / Pint)
+
+NOMAD uses strict Metainfo validation and Pint-based unit parsing. `to-nomad` automatically handles identifier sanitization and unit translation to guarantee upload compatibility:
+
+### 1. Identifier Sanitization (NOMAD Metainfo Compatibility)
+NOMAD Metainfo requires section and quantity definition keys to be valid Python identifiers matching `^[a-zA-Z_][a-zA-Z0-9_]*$`. When transforming arbitrary collection keys or column headers (e.g. from experimental CSV/HDF datasets), `to-nomad` automatically normalizes names:
+- `/` is translated to `_per_` (e.g. `Hc_A/m_gb1nm` → `Hc_A_per_m_gb1nm`, `A_J/m` → `A_J_per_m`)
+- `%` is translated to `_pct_` (e.g. `Rwp_%ESRF` → `Rwp_pct_ESRF`)
+- `.`, `^`, `-`, spaces, and special symbols are replaced by `_` (e.g. `Js_gb_0.05` → `Js_gb_0_05`, `K_1_J/m^3` → `K_1_J_per_m_3`)
+- Leading digits are prefixed with `_`
+- Consecutive underscores are collapsed and trimmed
+
+> **Traceability**: The original entity/column name is always preserved in the `mammos_entities` metadata section under `name`, with `value_key` pointing to the sanitized schema identifier in `data` and `definitions`.
+
+### 2. Unit Translation (Astropy Units → Pint / NOMAD)
+`mammos-entity` utilizes Astropy Units (`astropy.units`), whereas NOMAD uses Pint (`pint`) for unit definition and validation. `to-nomad` bridges the syntax differences automatically:
+- **Temperature aliases**: Astropy's `deg_C`, `deg_F`, `deg_R` are mapped to Pint's `degC`, `degF`, `degR`.
+- **Implicit exponents**: Exponents without carets (e.g. `m3`, `cm-2`, `s+1`, `Am2/kg`) are converted to explicit exponents (e.g. `m^3`, `cm^-2`, `s^1`, `A m^2 / kg`).
+- **Casing & Symbol mapping**: `Angstrom` → `angstrom`, `micron` → `micrometer`, `amu` → `unified_atomic_mass_unit`.
+- **Division spacing**: Normalized to consistent ` / ` syntax (e.g. `J / (kg * K)`).
+
+### 3. CSV Column Naming for HDF5 Reference Mode
+When using `hdf_reference_mode=True`, column names from CSV files are used as HDF5 dataset names.
+Column names containing certain characters (notably `/`) create nested HDF5 group structures that are
+incompatible with NOMAD's HDF5Normalizer. To prevent this:
+
+**Prevent nested groups by avoiding `/` in CSV column names.** The characters `/`, `%`, `.`, `^`, `-`,
+spaces, and other special symbols are automatically sanitized in the generated NOMAD archive,
+but this sanitization happens *after* the HDF5 file is created, causing a mismatch between
+HDF5 dataset paths and quantity names.
+
+**Recommended practice for CSV files:**
+- Use only letters, digits, and underscores in column names
+- Replace `/` with `_per_` (e.g., `A_J/m` → `A_J_per_m`)
+- Replace `%` with `_pct_` (e.g., `Rwp_%` → `Rwp_pct_`)
+- Replace other special characters with `_`
+- Prefix leading digits with `_`
+
+**Sanitization is optional:** If your CSV column names already follow these rules,
+sanitization is not needed. The `prepare_csv_for_nomad()` function and its CLI script
+provide an optional `--no-sanitize` flag to copy CSV files without modification.
+
+**Helper script:** The `prepare_csv_for_nomad` function is available in the to-nomad package:
+
+```python
+from to_nomad import prepare_csv_for_nomad
+prepare_csv_for_nomad("input.csv", "output.csv")  # With sanitization (default)
+prepare_csv_for_nomad("input.csv", "output.csv", sanitize=False)  # Without sanitization
+```
+
+Or via CLI:
+```bash
+# With sanitization (default):
+python -m to_nomad.prepare_csv_for_nomad input.csv output.csv
+
+# Without sanitization:
+python -m to_nomad.prepare_csv_for_nomad input.csv output.csv --no-sanitize
+```
+
+Note: For simple cases, you can also load the CSV with `mammos_entity.from_csv()`,
+then use entity names directly (programmatic entities don't have special characters).
+
+## Nested EntityCollections
+
+**Creating nested collections** is plain Python — no file is involved:
+
+```python
+sub = me.EntityCollection(description="Intrinsic properties", Ms=..., ...)
+sample = me.EntityCollection(description="Sample", intrinsic=sub)
+```
+
+**Saving and loading nested data** (the *data-file* level, independent of NOMAD):
+
+| Format | Nested sub-collections | Reader |
+|---|---|---|
+| HDF5 (`.h5`) | Yes — nested groups | `me.from_hdf5` |
+| MaMMoS YAML (`.yaml`) | Yes — recursive collection nodes (v2 format) | `me.from_yaml` |
+| CSV (`.csv`) | No — flat, single table | `me.from_csv` |
+
+**In the NOMAD archive YAML** nested collections become sub-sections
+(`definitions`) and nested dictionaries (`data`).
+
+**Value storage in the NOMAD archive YAML:**
+
+- Inline mode (default): entity values are written into the `data` section.
+- `hdf_reference_mode=True`: the input *must* be an HDF file path, because
+  NOMAD's `HDF5Normalizer` reads the uploaded `.h5` file. Every quantity —
+  entity or plain value, at any nesting depth — is annotated with
+  `m_annotations.hdf5.path` pointing to its HDF5 dataset, and values are
+  omitted from the archive. Plain values inside sub-collections are
+  additionally kept inline. Upload the archive YAML together with the `.h5`
+  file (see also the `hdf_reference_mode` notes in the API section).
+
+See `examples/from_nested_collection.py` for a runnable demonstration.
+
+## Plotting x-y curves in NOMAD
+
+NOMAD does not render an x-y curve merely because two arrays exist in an
+HDF5 file. Two declarative elements are required in the NOMAD archive
+YAML, and `to_nomad(..., plots=[...])` generates both:
+
+1. The **entry (root) section** inherits from
+   `nomad.datamodel.metainfo.plot.PlotSection` and carries a
+   `plotly_express` annotation referencing the two quantities as x and y.
+   `PlotSection` is listed **before** the data-filling base section
+   (`HDF5Normalizer`): otherwise the figures are created before the HDF5
+   data is read and the plot stays empty (nomad-FAIR issue #2717).
+2. Quantities inside sub-sections are referenced by data path, e.g.
+   `#magnetization_curve/H` for a sub-collection `magnetization_curve`.
+
+Each entry in `plots` is a dict:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `x`, `y` | Quantity names (required for curve plots) | — |
+| `img` or `z` | Quantity name for image plots (used instead of `x`/`y`) | — |
+| `target` | Dotted sub-section path containing the quantities; empty = entry section | `""` |
+| `label` | Trace label | `f"{y}({x})"` |
+| `title` | Plot title | `label` |
+| `x_label`, `y_label` | Axis titles | `f"{name} ({unit})"` |
+| `method` | plotly.express method | `"line"` |
+
+Axis titles automatically include the quantity units. Image plots: pass
+`img` (or `z`) with a 2-D quantity and a `method` such as `imshow`; the
+image is rendered from the HDF-referenced array (see
+`examples/from_sem_image.py`).
+
+For HDF inputs the referenced HDF5 groups are additionally tagged with
+NeXus `NXdata` attributes (`signal`, `axes`, `units`), so the curve also
+renders in the H5Web file preview of the NOMAD upload.
+
+```python
+to_nomad.to_nomad(
+    h5_path,
+    yaml_path,
+    hdf_reference_mode=True,
+    plots=[{"target": "magnetization_curve", "x": "H", "y": "M", "label": "M(H)"}],
+)
+```
+
+Runnable examples: `examples/from_curve_plot_simple.py` (single sample)
+and `examples/from_curve_plot_advanced.py` (several nested samples, one
+figure per sample).
+
+## Structure preview from a CIF file
+
+NOMAD renders a 3-D structure preview in the entry overview when the
+material/optimade results are populated. `to_nomad(..., structure_file=...)`
+wires this up for a crystal-structure file shipped in the same upload:
+
+> **Important:** NOMAD never reads the `.cif` at upload time. The structure
+> shown in the overview is the one that `to_nomad(..., structure_file=...)`
+> parsed **locally** and embedded into the `.archive.yaml` when the archive
+> was generated. If you change the `.cif` and re-upload only the `.cif`,
+> the preview will **not** change — regenerate the archive (rerun
+> `to_nomad`) so the updated structure is embedded. The `.cif` in the upload
+> serves as raw data (provenance and download) only. The local parse is a
+> deliberate workaround: the `ElnWithStructureFile` base section, which
+> would parse the file server-side, fails deterministically on nomad-lab
+> 2.0.0 (`AttributeError: qualified_name`). The root cause is proven at
+> source level (the normalizer chain stores a direct `atoms_ref`
+> reference into a temporary run section that `ElnWithStructureFile`
+> then deletes, which breaks serialization); as of 2026-10-23 the bug is
+> unfixed on the develop branch and unreported upstream. An upstream
+> report draft is prepared, and the local-parse workaround matches the
+> direction the NOMAD maintainers chose in nomad-FAIR issue #2250
+> (build the structure viewer from a System section in the archive
+> instead of parsing CIF files server-side).
+
+- the structure file is parsed **locally with ASE** and embedded as an
+  inline top-level `run` section in the `.archive.yaml` (positions and
+  lattice vectors converted to the NOMAD base unit meter),
+- the archive declares `metadata: {domain: dft}` so the server-side
+  normalizer chain includes the `OptimadeNormalizer`, which populates
+  `metadata.optimade` (sites, lattice, species) from the inline run —
+  the data the GUI renders as the structure viewer,
+- the file is copied next to the generated `.archive.yaml` (mirroring
+  the upload layout) and included in the zip when `create_zip=True`,
+  and the `structure_file` data field records its upload-relative
+  name.
+
+```python
+to_nomad.to_nomad(
+    h5_path,
+    yaml_path,
+    hdf_reference_mode=True,
+    structure_file="path/to/structure.cif",
+)
+```
+
+The `.cif` should be uploaded together with the archive YAML (same zip
+or directory) as raw data (provenance and download fallback). See
+`examples/from_cif_structure.py` for a runnable demo that combines a
+published Co2Fe2H4 structure with an EntityCollection of ontology-backed
+properties.
+
+Note: the `ElnWithStructureFile` base section is deliberately not used —
+entries using it fail deterministically on nomad-lab 2.0.0 during
+archive persistence (`AttributeError: qualified_name`).
+
+GUI trade-off (new NOMAD interface): the structure preview requires the
+`dft` domain, and dft-domain entries render the DFT-style Overview —
+which shows the Material/structure card but does **not** include the
+generic Figures card. Figures of structure-bearing archives are
+reachable under Archive → Data → Figures. Archives *without* a
+structure render their figures in the Overview instead — choose per
+archive which presentation matters more.
+
+## Uploading via the API
+
+`to_nomad.upload_to_nomad` uploads existing files into an existing
+NOMAD project (upload) via the REST API, safely by default:
+
+- **Dry-run by default:** prints the plan (files with sizes and
+  SHA-256 checksums, target project, API URL) with **zero network
+  access**; the real transfer requires `--yes`.
+- **Explicit target:** `--project-id` is mandatory; the project must
+  be yours and unpublished (published projects are read-only for the
+  tool). Existing server-side files are never overwritten without
+  `--allow-overwrite`.
+- **Scope-limited token:** authenticate with a personal access token
+  (PAT) created in the GUI (Settings → User Settings → Tokens) with
+  exactly the scopes `uploads:read` + `uploads:write` — such a token
+  can upload but **cannot publish** (publishing needs the separate
+  scope `uploads:publish`; scope checks are enforced server-side).
+- **Token handling:** the token is read only from the environment
+  variable `NOMAD_CLIENT_ACCESS_TOKEN` or a file outside the
+  repository (`~/.config/to_nomad/token`, `chmod 600`); never from a
+  command-line argument, never logged.
+- **Verification:** after the transfer the tool can wait for
+  server-side processing (`--wait`) and reports per-entry
+  `process_status` and errors; a read-only status check is available
+  via `--status`.
+- **No destructive endpoints:** the tool implements no delete,
+  publish or metadata-edit calls.
+
+```bash
+pixi run upload <files...> --project-id <id>            # dry-run (default)
+pixi run upload <files...> --project-id <id> --yes      # real upload
+pixi run upload <files...> --project-id <id> --yes --wait   # + processing report
+pixi run upload --project-id <id> --status              # read-only status
+```
+
+See `examples/upload_example.py` for the programmatic API (dry-run,
+no token needed). Large uploads are streamed with constant memory
+and a configurable socket timeout (no total-time cap).
+
+## Local validation (optional)
+
+Generated archives can be validated offline against the real NOMAD
+parser and normalizer chain (including `HDF5Normalizer` and
+`PlotSection`) before uploading. The `nomad-test` environment is opt-in —
+regular users never install `nomad-lab`. Note for `structure_file`
+entries: nomad-lab 2.0.0 loads the run schema from the `RunSchema`
+plugin entry point, so the environment includes
+`nomad-schema-plugin-run`; without it, `ElnWithStructureFile` fails with
+`'NoneType' object has no attribute 'run'`:
+
+```bash
+pixi run -e nomad-test validate examples/output/simple_curve.archive.yaml
+```
+
+The command reports the number of filled HDF5-referenced quantities and
+the x/y value counts of every declared figure, exits non-zero on empty
+values, and writes the full normalized archive as
+`<stem>.validated.json` next to the archive for inspection
+(`--json PATH` overrides the destination). Upload the `.archive.yaml`
+together with its data file, and validate locally first: what validates
+here is exactly what NOMAD will process.
+
 ## API
 
 | Function / class | Description |
@@ -222,7 +511,15 @@ Note: NOMAD `HDF5Normalizer` supports extensions like `.h5` and `.hdf5` (not
 ## Examples
 
 - [examples/quickstart.py](examples/quickstart.py) – basic non-interactive usage.
-- More examples are in [examples/output/](examples/output/) after running `pixi run example`.
+- [examples/from_mammos_files.py](examples/from_mammos_files.py) – file-based conversion from MaMMoS YAML/CSV/HDF.
+- [examples/from_nested_collection.py](examples/from_nested_collection.py) – nested EntityCollections in HDF reference mode.
+- [examples/from_curve_plot_simple.py](examples/from_curve_plot_simple.py) – single M(H) curve plotted in NOMAD (overview plot + H5Web preview).
+- [examples/from_curve_plot_advanced.py](examples/from_curve_plot_advanced.py) – several nested samples, one plot per sample.
+- [examples/from_sem_image.py](examples/from_sem_image.py) – SEM micrograph (2-D image) referenced from HDF5: overview imshow plot + NeXus H5Web preview.
+- [examples/from_cif_structure.py](examples/from_cif_structure.py) – CIF crystal structure shipped in the upload: 3-D structure preview in the overview, next to HDF-referenced entities.
+- [examples/from_sample_collection.py](examples/from_sample_collection.py) – three nested samples, each with an M(H) curve and an SEM micrograph (one figure each), plus a shared inline structure preview.
+- [examples/upload_example.py](examples/upload_example.py) – safe API upload of generated files (dry-run, no token needed).
+- More examples are in [examples/output/](examples/output/) after running the individual scripts.
 
 ## Acknowledgements
 

@@ -40,11 +40,29 @@ def _section_name_from(name: str) -> str:
     return s or "MaMMoSData"
 
 
+def _nomad_quantity_name(name: str) -> str:
+    """Derive a valid NOMAD identifier from an arbitrary entity or column name."""
+    s = name.replace("%", "_pct_").replace("/", "_per_").replace("^", "_")
+    s = re.sub(r"[^a-zA-Z0-9_]", "_", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    if s and s[0].isdigit():
+        s = "_" + s
+    return s or "quantity"
+
+
 def _nomad_type(value: Any) -> str:
     """Return the NOMAD type string for a scalar-or-array value."""
     try:
         arr = np.asanyarray(value)
+        if arr.dtype == np.bool_:
+            return "bool"
         if np.issubdtype(arr.dtype, np.integer):
+            # Scalar integers use the Python type; integer arrays need the
+            # numpy dtype: the metainfo python-int type converts arrays to
+            # lists, which only supports one dimension (nomad data_type.py,
+            # "Python array must be one dimensional").
+            if arr.ndim > 0 and arr.size > 1:
+                return "np.int64"
             return "int"
         if np.issubdtype(arr.dtype, np.floating) or np.issubdtype(
             arr.dtype, np.complexfloating
@@ -65,14 +83,34 @@ def _unit_str(entity_like: Any) -> str | None:
     return s if s else None
 
 
+_ASTROPY_TO_PINT_MAP: dict[str, str] = {
+    "deg_C": "degC",
+    "deg_F": "degF",
+    "deg_R": "degR",
+    "Angstrom": "angstrom",
+    "micron": "micrometer",
+    "amu": "unified_atomic_mass_unit",
+    "pct": "%",
+}
+
+
 def _normalize_unit_for_nomad(unit_str: str) -> str:
     """Convert Astropy-style unit strings to NOMAD/Pint compatible notation.
 
     Astropy may render powers as implicit suffixes (e.g. ``m3`` or ``m-2``),
     while Pint in NOMAD expects explicit exponents (e.g. ``m^3`` or ``m^-2``).
     """
-    # Convert tokens like `m3`, `cm-2`, `s+1` to `m^3`, `cm^-2`, `s^1`.
-    normalized = re.sub(r"\b([A-Za-z]+)([+-]?\d+)\b", r"\1^\2", unit_str)
+    normalized = unit_str.strip()
+
+    # Convert tokens like `m3`, `cm-2`, `s+1` to `m^3`, `cm^-2`, `s^1` first
+    # so trailing digits don't block word-boundary matching on unit names (e.g. Angstrom3).
+    normalized = re.sub(r"\b([A-Za-z]+)([+-]?\d+)\b", r"\1^\2", normalized)
+
+    # Map known Astropy-specific token differences to Pint
+    for astropy_u, pint_u in _ASTROPY_TO_PINT_MAP.items():
+        flags = re.IGNORECASE if astropy_u.lower() == "angstrom" else 0
+        normalized = re.sub(rf"\b{re.escape(astropy_u)}\b", pint_u, normalized, flags=flags)
+
     # Keep a single consistent spacing around division signs.
     normalized = re.sub(r"\s*/\s*", " / ", normalized)
     return normalized.strip()
@@ -87,6 +125,27 @@ def _is_array(value: Any) -> bool:
         return arr.ndim > 0 and arr.size > 1
     except Exception:
         return False
+
+
+def _shape_of(value: Any) -> list[str] | None:
+    """Return the NOMAD shape annotation matching the array dimensionality.
+
+    Args:
+        value: An entity-like value.
+
+    Returns:
+        A list of '*' placeholders (one per array dimension), or None for
+        scalar values.
+    """
+    if isinstance(value, str):
+        return None
+    try:
+        arr = np.asanyarray(value)
+    except Exception:
+        return None
+    if arr.ndim > 0 and arr.size > 1:
+        return ["*"] * arr.ndim
+    return None
 
 
 def _to_serializable(value: Any) -> Any:
@@ -117,8 +176,9 @@ def _quantity_def(
         unit = _unit_str(entity_like)
         if unit:
             q["unit"] = unit
-        if _is_array(entity_like.value):
-            q["shape"] = ["*"]
+        shape = _shape_of(entity_like.value)
+        if shape:
+            q["shape"] = shape
 
         # Build a structured description combining ontology info
         desc_parts: list[str] = []
@@ -127,7 +187,7 @@ def _quantity_def(
         if include_ontology_context and entity_like.ontology_label:
             desc_parts.append(f"ontology: {entity_like.ontology_label}")
         if include_ontology_context and entity_like.ontology_iri:
-            desc_parts.append(f"IRI: {entity_like.ontology_iri}")
+            desc_parts.append(f"IRI: [{entity_like.ontology_iri}]({entity_like.ontology_iri})")
         if desc_parts:
             q["description"] = " | ".join(desc_parts)
 
@@ -137,8 +197,9 @@ def _quantity_def(
         if unit:
             q["unit"] = unit
         val = getattr(entity_like, "value", entity_like)
-        if _is_array(val):
-            q["shape"] = ["*"]
+        shape = _shape_of(val)
+        if shape:
+            q["shape"] = shape
 
     elif isinstance(entity_like, str):
         q["type"] = "str"
@@ -157,21 +218,26 @@ def _quantity_def(
         try:
             arr = np.asanyarray(entity_like)
             q["type"] = _nomad_type(arr)
-            if _is_array(arr):
-                q["shape"] = ["*"]
+            shape = _shape_of(arr)
+            if shape:
+                q["shape"] = shape
         except Exception:
             q["type"] = "str"
 
     return q
 
 
-def _mammos_entity_record(name: str, entity_like: Any) -> dict[str, str]:
+def _mammos_entity_record(
+    name: str,
+    entity_like: Any,
+    value_key: str | None = None,
+) -> dict[str, str]:
     """Build retrieval-focused metadata for one entry from the source collection."""
     import mammos_entity as me  # noqa: PLC0415
 
     record: dict[str, str] = {
         "name": name,
-        "value_key": name,
+        "value_key": value_key if value_key is not None else name,
         "source_type": type(entity_like).__name__,
         "ontology_label": "",
         "ontology_iri": "",
@@ -218,6 +284,132 @@ def _normalize_elemental_composition(
 # ---------------------------------------------------------------------------
 
 
+def _apply_hdf_quantity_annotations(
+    section_def: dict[str, Any],
+    annotations: dict[str, dict[str, Any]],
+) -> None:
+    """Merge ``m_annotations.hdf5`` entries into (nested) quantity definitions.
+
+    Args:
+        section_def: Section definition whose quantities may be nested inside
+            ``sub_sections``.
+        annotations: Mapping from dotted quantity location (for example
+            ``material.unit_cell.cell_volume``) to quantity-definition
+            overrides containing ``m_annotations``. Path segments address
+            sub-sections; the final segment addresses a quantity.
+    """
+    for qualified_name, qextra in annotations.items():
+        parts = qualified_name.split(".")
+        target: dict[str, Any] = section_def
+        for part in parts[:-1]:
+            sub_section = target.get("sub_sections", {}).get(part)
+            if not isinstance(sub_section, dict) or "section" not in sub_section:
+                target = {}
+                break
+            target = sub_section["section"]
+        if not target:
+            continue
+        qname = _nomad_quantity_name(parts[-1])
+        section_quantities = target.get("quantities", {})
+        if qname not in section_quantities:
+            continue
+        merged = dict(section_quantities[qname])
+        existing_annotations = dict(merged.get("m_annotations", {}))
+        existing_annotations.update(qextra.get("m_annotations", {}))
+        merged["m_annotations"] = existing_annotations
+        for key, value in qextra.items():
+            if key != "m_annotations":
+                merged[key] = value
+        section_quantities[qname] = merged
+
+
+def _apply_plot_annotations(
+    entry_section: dict[str, Any],
+    plots: list[dict[str, Any]],
+) -> None:
+    """Inject PlotSection base section and plotly_express annotations.
+
+    The annotation is attached to the entry (root) section, with PlotSection
+    listed before the data-filling base section (HDF5Normalizer): otherwise
+    the plotly figures are created before the HDF data is read and the plot
+    stays empty (nomad-FAIR issue #2717). Quantities inside a target
+    sub-section are referenced with the '#' prefix and a slash-separated
+    data path (e.g. ``#magnetization_curve/H``).
+    """
+    plot_base = "nomad.datamodel.metainfo.plot.PlotSection"
+
+    for plot in plots:
+        if not isinstance(plot, dict):
+            continue
+        x = plot.get("x")
+        y = plot.get("y")
+        img = plot.get("img") or plot.get("z")
+        if not ((x and y) or img):
+            continue
+
+        target = plot.get("target") or ""
+        target_sec = entry_section
+        target_path = ""
+        if target:
+            # Support nested dotted paths (e.g. "material.magnetization_curve")
+            parts = target.split(".")
+            curr = entry_section
+            found = True
+            for part in parts:
+                sub_secs = curr.get("sub_sections", {})
+                if part in sub_secs and "section" in sub_secs[part]:
+                    curr = sub_secs[part]["section"]
+                else:
+                    found = False
+                    break
+            if found:
+                target_sec = curr
+                target_path = "/".join(parts)
+
+        base = list(entry_section.get("base_sections", []))
+        if plot_base not in base:
+            idx = next(
+                (i for i, b in enumerate(base) if "HDF5Normalizer" in b), len(base)
+            )
+            base.insert(idx, plot_base)
+            entry_section["base_sections"] = base
+
+        q_x = target_sec.get("quantities", {}).get(x, {})
+        q_y = target_sec.get("quantities", {}).get(y, {})
+        u_x = q_x.get("unit")
+        u_y = q_y.get("unit")
+
+        x_title = plot.get("x_label") or (f"{x} ({u_x})" if u_x else x)
+        y_title = plot.get("y_label") or (f"{y} ({u_y})" if u_y else y)
+        title = plot.get("title") or plot.get("label") or f"{y} vs {x}"
+        method = plot.get("method", "line")
+        if img and not (x and y):
+            label = plot.get("label", img)
+            x_title = x_title or "x (pixel)"
+            y_title = y_title or "y (pixel)"
+        else:
+            label = plot.get("label", f"{y}({x})")
+
+        trace: dict[str, Any] = {
+            "method": method,
+            "label": label,
+            "layout": {
+                "title": {"text": title},
+                "xaxis": {"title": {"text": x_title}},
+                "yaxis": {"title": {"text": y_title}},
+            },
+        }
+        if img and not (x and y):
+            trace["img"] = f"#{target_path}/{img}" if target_path else f"#{img}"
+        else:
+            trace["x"] = f"#{target_path}/{x}" if target_path else f"#{x}"
+            trace["y"] = f"#{target_path}/{y}" if target_path else f"#{y}"
+
+        annotations = entry_section.setdefault("m_annotations", {})
+        px_list = annotations.setdefault("plotly_express", [])
+        px_list.append(trace)
+
+
 def generate_archive(
     data: mammos_entity.EntityCollection | mammos_entity.Entity,
     *,
@@ -233,6 +425,7 @@ def generate_archive(
     elemental_composition: list[dict[str, Any]] | None = None,
     default_entry_name: str = "MaMMoS Data",
     extra_quantities: dict[str, dict[str, Any]] | None = None,
+    hdf_quantity_annotations: dict[str, dict[str, Any]] | None = None,
     extra_data: dict[str, Any] | None = None,
     extra_base_sections: list[str] | None = None,
     include_entity_values: bool = True,
@@ -241,6 +434,8 @@ def generate_archive(
     include_nomad_generation_metadata: bool = False,
     nomad_generation_metadata: dict[str, Any] | None = None,
     include_ontology_in_yaml: bool = True,
+    map_collection_with_ontology: bool = False,
+    plots: list[dict[str, Any]] | None = None,
 ) -> dict:
     """Generate a NOMAD archive dictionary from mammos-entity data.
 
@@ -285,6 +480,11 @@ def generate_archive(
             Optional additional quantity definitions to append to the generated
             section quantities. Keys are quantity names, values are quantity
             definition dictionaries (NOMAD schema format).
+        hdf_quantity_annotations:
+            Optional ``m_annotations.hdf5.path`` overrides for quantities,
+            including ones nested inside sub-sections. Keys are dotted
+            quantity locations (e.g. ``material.unit_cell.cell_volume``),
+            values are quantity-definition override dictionaries.
         extra_data:
             Optional additional key/value pairs to append to the ``data``
             section.
@@ -310,6 +510,15 @@ def generate_archive(
         include_ontology_in_yaml:
             If ``True`` (default), include ontology label/IRI in quantity
             descriptions.
+        map_collection_with_ontology:
+            If ``True``, EntityCollections with descriptions matching ontology
+            labels will automatically have an ``ontology_reference`` Entity added
+            with value 1. When enabled, warnings are emitted for descriptions that
+            do not match any ontology label. Default is ``False``.
+        plots:
+            Optional list of x-y plot declarations attached to the entry
+            section as ``plotly_express`` annotations (see
+            :func:`to_nomad.to_nomad` for the entry format).
 
     Returns:
         A nested dictionary ready for YAML serialization in NOMAD archive
@@ -377,37 +586,69 @@ def generate_archive(
         }
 
     mammos_entity_records: list[dict[str, str]] = []
+    nested_collections: dict[str, mammos_entity.EntityCollection] = {}
+
+    def _add_ontology_reference_to_collection(
+        sub_col: mammos_entity.EntityCollection,
+    ) -> mammos_entity.EntityCollection:
+        """Add ontology_reference to collection if description matches ontology label.
+        
+        Recursively processes nested EntityCollections.
+        """
+        import warnings
+        
+        if not map_collection_with_ontology:
+            return sub_col
+        
+        # Create new collection (may need to add ontology_reference)
+        new_col = me.EntityCollection(description=sub_col.description)
+        
+        # Check if this collection's description matches an ontology label
+        if sub_col.description:
+            try:
+                matches = me.search_labels(sub_col.description, auto_wildcard=False)
+                if matches:
+                    # Add ontology_reference as first item
+                    new_col.ontology_reference = me.Entity(sub_col.description, 1, None)
+                else:
+                    warnings.warn(
+                        f"EntityCollection description '{sub_col.description}' does not "
+                        f"match any ontology label (auto_wildcard=False)",
+                        UserWarning,
+                        stacklevel=5,
+                    )
+            except Exception:
+                warnings.warn(
+                    f"Failed to check ontology label for EntityCollection "
+                    f"description '{sub_col.description}'",
+                    UserWarning,
+                    stacklevel=5,
+                )
+        
+        # Copy all items from original collection, recursively processing nested ones
+        for name, entity in sub_col:
+            if isinstance(entity, me.EntityCollection):
+                # Recursively process nested collections
+                setattr(new_col, name, _add_ontology_reference_to_collection(entity))
+            else:
+                setattr(new_col, name, entity)
+        
+        return new_col
 
     for ename, entity_like in col:
         if isinstance(entity_like, me.EntityCollection):
-            # Nested collections cannot be represented as a flat quantity.
-            # Flatten one level deep by prefixing the key.
-            for sub_name, sub_entity in entity_like:
-                if isinstance(sub_entity, me.EntityCollection):
-                    import warnings  # noqa: PLC0415
-
-                    warnings.warn(
-                        f"Nested EntityCollection '{ename}.{sub_name}' is more "
-                        "than one level deep and will be skipped.",
-                        stacklevel=2,
-                    )
-                    continue
-                flat_key = f"{ename}__{sub_name}"
-                quantities[flat_key] = _quantity_def(
-                    flat_key,
-                    sub_entity,
-                    include_ontology_context=include_ontology_in_yaml,
-                )
-                mammos_entity_records.append(
-                    _mammos_entity_record(flat_key, sub_entity)
-                )
+            # Store nested collections for sub-section processing later
+            # Apply ontology reference mapping if enabled
+            nested_collections[ename] = _add_ontology_reference_to_collection(entity_like)
+            continue
         else:
-            quantities[ename] = _quantity_def(
-                ename,
+            qname = _nomad_quantity_name(ename)
+            quantities[qname] = _quantity_def(
+                qname,
                 entity_like,
                 include_ontology_context=include_ontology_in_yaml,
             )
-            mammos_entity_records.append(_mammos_entity_record(ename, entity_like))
+            mammos_entity_records.append(_mammos_entity_record(ename, entity_like, value_key=qname))
 
     if extra_quantities:
         for qname, qextra in extra_quantities.items():
@@ -480,6 +721,53 @@ def generate_archive(
             },
         }
 
+    # Process nested EntityCollections as sub-sections
+    # This supports arbitrary nesting depth via recursive sub-sections
+    def _build_sub_section(
+        sub_col: mammos_entity.EntityCollection,
+        parent_path: str = "",
+    ) -> dict[str, Any] | None:
+        """Recursively build a sub-section dict from a nested EntityCollection."""
+        sub_section_quantities: dict[str, dict] = {}
+        sub_sub_sections: dict[str, Any] = {}
+        
+        for name, entity in sub_col:
+            if isinstance(entity, me.EntityCollection):
+                # Recursively process nested collections as sub-sub-sections
+                nested_result = _build_sub_section(entity, f"{parent_path}.{name}" if parent_path else name)
+                if nested_result:
+                    sub_sub_sections[name] = nested_result
+            else:
+                # Add regular entity to quantities
+                qname = _nomad_quantity_name(name)
+                sub_section_quantities[qname] = _quantity_def(
+                    qname,
+                    entity,
+                    include_ontology_context=include_ontology_in_yaml,
+                )
+                # Track in mammos_entity_records with qualified name
+                qualified_name = f"{parent_path}.{name}" if parent_path else name
+                mammos_entity_records.append(
+                    _mammos_entity_record(qualified_name, entity, value_key=qname)
+                )
+        
+        # Only create sub-section if it has quantities or sub-sections
+        if sub_section_quantities or sub_sub_sections:
+            result: dict[str, Any] = {
+                "section": {
+                    "quantities": sub_section_quantities,
+                }
+            }
+            if sub_sub_sections:
+                result["section"]["sub_sections"] = sub_sub_sections
+            return result
+        return None
+    
+    for sub_section_name, sub_col in nested_collections.items():
+        sub_section_def = _build_sub_section(sub_col, sub_section_name)
+        if sub_section_def:
+            sub_sections[sub_section_name] = sub_section_def
+
     definitions: dict = {
         "name": name,
         "sections": {
@@ -490,6 +778,14 @@ def generate_archive(
             }
         },
     }
+
+    if hdf_quantity_annotations:
+        _apply_hdf_quantity_annotations(
+            definitions["sections"][section_name], hdf_quantity_annotations
+        )
+
+    if plots:
+        _apply_plot_annotations(definitions["sections"][section_name], plots)
 
     # ------------------------------------------------------------------
     # Build the data block.
@@ -530,16 +826,64 @@ def generate_archive(
 
     # Entity values (optional; can be omitted in reference-based workflows)
     if include_entity_values:
+        # First, add regular (non-nested) entity values
         for ename, entity_like in col:
             if isinstance(entity_like, me.EntityCollection):
-                for sub_name, sub_entity in entity_like:
-                    if isinstance(sub_entity, me.EntityCollection):
-                        continue
-                    flat_key = f"{ename}__{sub_name}"
-                    val = getattr(sub_entity, "value", sub_entity)
-                    data_block[flat_key] = _to_serializable(val)
-            else:
-                val = getattr(entity_like, "value", entity_like)
-                data_block[ename] = _to_serializable(val)
+                continue  # Skip nested collections; processed below
+            qname = _nomad_quantity_name(ename)
+            val = getattr(entity_like, "value", entity_like)
+            data_block[qname] = _to_serializable(val)
+        
+        # Then, add nested collection values as nested dictionaries (recursively)
+        def _build_nested_data(sub_col: mammos_entity.EntityCollection) -> dict[str, Any]:
+            """Recursively build nested data dict from a nested EntityCollection."""
+            result: dict[str, Any] = {}
+            for name, entity in sub_col:
+                if isinstance(entity, me.EntityCollection):
+                    # Recursively process nested collections
+                    nested_data = _build_nested_data(entity)
+                    if nested_data:
+                        result[name] = nested_data
+                else:
+                    # Add regular entity value
+                    qname = _nomad_quantity_name(name)
+                    val = getattr(entity, "value", entity)
+                    result[qname] = _to_serializable(val)
+            return result
+        
+        for sub_section_name, sub_col in nested_collections.items():
+            sub_data = _build_nested_data(sub_col)
+            if sub_data:
+                data_block[sub_section_name] = sub_data
+    else:
+        # Reference-based workflow: entity values are read from the HDF file
+        # via m_annotations.hdf5.path. Sub-section instances are still written
+        # so NOMAD renders the sections and can fill the annotated quantities;
+        # plain (non-entity) values remain inline.
+
+        def _build_skeleton(sub_col: mammos_entity.EntityCollection) -> dict[str, Any]:
+            """Recursively build a sub-section instance without entity values."""
+            result: dict[str, Any] = {}
+            for name, entity in sub_col:
+                if isinstance(entity, me.EntityCollection):
+                    result[name] = _build_skeleton(entity)
+                elif isinstance(entity, me.Entity):
+                    continue  # value comes from the HDF file
+                else:
+                    # Plain arrays are not inlined: they live in the HDF5
+                    # file and are referenced via m_annotations.hdf5.path.
+                    val = getattr(entity, "value", entity)
+                    try:
+                        is_array = np.asanyarray(val).ndim > 0
+                    except Exception:
+                        is_array = False
+                    if not is_array:
+                        result[_nomad_quantity_name(name)] = _to_serializable(
+                            val
+                        )
+            return result
+
+        for sub_section_name, sub_col in nested_collections.items():
+            data_block[sub_section_name] = _build_skeleton(sub_col)
 
     return {"definitions": definitions, "data": data_block}

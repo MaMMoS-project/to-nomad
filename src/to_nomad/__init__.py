@@ -16,6 +16,19 @@ Any metadata that is not stored in mammos-entity itself (such as the institute
 name or the data owner) is requested interactively when :func:`to_nomad` is
 called without those keyword arguments.
 
+Terminology: two kinds of YAML files
+-----------------------------------
+Do not confuse the two YAML formats involved in this package:
+
+- **NOMAD archive YAML** (``*.archive.yaml``): the upload artifact for NOMAD.
+  It contains a ``definitions`` section (the schema: sections and quantities)
+  and a ``data`` section (entry values). It is uploaded in parallel to the
+  raw data files, but can also hold values inline.
+- **mammos-entity collection YAML data file** (MaMMoS YAML): a data file
+  written by :py:meth:`mammos_entity.EntityCollection.to_yaml` and read with
+  :py:func:`mammos_entity.from_yaml`. It is an *input* to this package
+  (like MaMMoS CSV and HDF files), never a NOMAD upload artifact.
+
 Quick-start example
 -------------------
 ::
@@ -51,14 +64,16 @@ Quick-start example
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime, timezone
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from to_nomad._io import create_upload_zip, save_archive_yaml
 from to_nomad._prompt import collect_metadata
 from to_nomad._schema import generate_archive
+from to_nomad.prepare_csv_for_nomad import prepare_csv_for_nomad
 
 if TYPE_CHECKING:
     import mammos_entity
@@ -72,6 +87,7 @@ __all__ = [
     "save_archive_yaml",
     "create_upload_zip",
     "collect_metadata",
+    "prepare_csv_for_nomad",
 ]
 
 # Expose sub-modules for power users
@@ -171,6 +187,52 @@ def _hdf_dataset_paths(path: str | Path) -> set[str]:
     return out
 
 
+def _apply_nexus_plot_attributes(
+    h5_path: Path,
+    plots: list[dict[str, Any]],
+) -> None:
+    """Apply NeXus NXdata attributes to HDF5 groups so H5Web renders them as plots."""
+    try:
+        import h5py
+
+        with h5py.File(h5_path, "a") as f:
+            for plot in plots:
+                if not isinstance(plot, dict):
+                    continue
+                x = plot.get("x")
+                y = plot.get("y")
+                img = plot.get("img") or plot.get("z")
+                if not ((x and y) or img):
+                    continue
+
+                target = plot.get("target") or ""
+                # Convert dotted path like "material.magnetization_curve" to "/material/magnetization_curve"
+                path_parts = [p for p in target.replace(".", "/").split("/") if p]
+                group_path = "/" + "/".join(path_parts) if path_parts else "/"
+
+                if group_path in f:
+                    grp = f[group_path]
+                    if isinstance(grp, h5py.Group):
+                        grp.attrs["NX_class"] = "NXdata"
+                        if img and not (x and y):
+                            # 2-D image: signal only; H5Web renders a 2-D
+                            # NXdata signal as an image without axes.
+                            grp.attrs["signal"] = img
+                        else:
+                            grp.attrs["signal"] = y
+                            grp.attrs["axes"] = [x]
+                        for name in {n for n in (x, y, img) if n}:
+                            if (
+                                name in grp
+                                and "unit" in grp[name].attrs
+                                and "units" not in grp[name].attrs
+                            ):
+                                grp[name].attrs["units"] = grp[name].attrs["unit"]
+    except Exception:
+        pass
+
+
+
 def _infer_mammos_csv_header_row(
     path: str | Path,
     expected_names: list[str],
@@ -205,6 +267,49 @@ def _safe_to_nomad_version() -> str:
     return __version__
 
 
+def _structure_run_section(structure_path: Path) -> dict[str, Any]:
+    """Parse a structure file with ASE into a NOMAD run-section dict.
+
+    The returned dict has the metainfo YAML shape of an archive ``run``
+    entry: one program (provenance) and one system whose ``atoms``
+    carry lattice_vectors, labels, positions, periodic and species.
+    Values are converted to the runschema base unit (meter) so the
+    plain numbers in the YAML are interpreted correctly.
+
+    Args:
+        structure_path: Path of the structure file (e.g. a CIF).
+
+    Returns:
+        Dict with 'program' and 'system' keys for the archive 'run'.
+
+    Raises:
+        ImportError: If the optional 'ase' dependency is missing.
+        Exception: If ASE cannot parse the file.
+    """
+    from ase.io import read
+
+    structure = read(str(structure_path))
+    angstrom_to_meter = 1e-10
+    return {
+        "program": {"name": "Structure File Importer"},
+        "system": [
+            {
+                "atoms": {
+                    "lattice_vectors": (
+                        structure.get_cell()[:] * angstrom_to_meter
+                    ).tolist(),
+                    "labels": list(structure.get_chemical_symbols()),
+                    "positions": (
+                        structure.get_positions() * angstrom_to_meter
+                    ).tolist(),
+                    "periodic": [bool(p) for p in structure.get_pbc()],
+                    "species": [int(z) for z in structure.get_atomic_numbers()],
+                }
+            }
+        ],
+    }
+
+
 def to_nomad(
     data: mammos_entity.EntityCollection | mammos_entity.Entity | str | Path,
     output: str | Path = "output.archive.yaml",
@@ -221,6 +326,9 @@ def to_nomad(
     include_mammos_entity_version: bool = False,
     include_nomad_generation_metadata: bool = True,
     include_ontology_in_yaml: bool | None = None,
+    map_collection_with_ontology: bool = False,
+    plots: list[dict[str, Any]] | None = None,
+    structure_file: str | Path | None = None,
     **metadata: str,
 ) -> Path:
     """Convert mammos-entity data to a NOMAD-compatible ``.archive.yaml`` file.
@@ -249,9 +357,10 @@ def to_nomad(
                         Either:
                         - an :class:`~mammos_entity.EntityCollection`,
                         - a single :class:`~mammos_entity.Entity`, or
-                        - a file path to MaMMoS data (`.csv`, `.yaml`, `.yml`, `.hdf`,
-                            `.h5`) which is loaded using the corresponding
-                            ``mammos_entity.from_*`` function.
+                        - a file path to a mammos-entity collection data file
+                            (MaMMoS YAML `.yaml`/`.yml`, CSV `.csv`, or HDF
+                            `.hdf`/`.h5`) which is loaded using the
+                            corresponding ``mammos_entity.from_*`` function.
 
         output:
             Destination path for the generated ``.archive.yaml`` file.
@@ -283,10 +392,13 @@ def to_nomad(
             ``m_annotations.hdf5.path`` and include ``data_file`` in data, while
             omitting inline entity values from the YAML ``data`` section.
         file_reference_mode:
-            If ``True`` and *data* is a CSV/YAML path, avoid inlining values in
-            YAML ``data`` and instead reference the uploaded source file via
-            ``data_file``. For CSV, add tabular parser annotations so NOMAD can
-            ingest values from the CSV content directly.
+            If ``True`` and *data* is a mammos-entity collection data file
+            (MaMMoS CSV or YAML), avoid inlining values in the NOMAD archive
+            YAML ``data`` section and instead reference the uploaded source
+            file via ``data_file``. For CSV, add tabular parser annotations
+            so NOMAD can ingest values from the CSV content directly. For
+            MaMMoS YAML data files there is no built-in NOMAD parser, so
+            values remain inline in the NOMAD archive YAML.
         hdf_entity_names:
             Optional list of top-level entity names to include when input is
             HDF. This allows the HDF file to contain more datasets than shown
@@ -308,6 +420,37 @@ def to_nomad(
         include_ontology_in_yaml:
             Controls whether ontology label/IRI are repeated in quantity
             descriptions. In ``hdf_reference_mode`` the default is ``False``.
+        map_collection_with_ontology:
+            If ``True``, EntityCollections with descriptions matching ontology
+            labels will automatically have an ``ontology_reference`` Entity added
+            with value 1. When enabled, warnings are emitted for descriptions that
+            do not match any ontology label. Default is ``False``.
+        plots:
+            Optional list of x-y plot declarations. Each entry is a dict with
+            keys ``x`` and ``y`` (quantity names), optional ``target`` (dotted
+            sub-section path containing the quantities, default: the entry
+            section), ``label``, ``title``, ``x_label``, ``y_label`` and
+            ``method`` (default ``line``). For HDF inputs, the referenced HDF5
+            groups are tagged with NeXus ``NXdata`` attributes for the H5Web
+            file preview, and the entry section gains ``PlotSection`` with a
+            ``plotly_express`` annotation for the overview plot.
+        structure_file:
+            Optional path to a crystal-structure file (e.g. a ``.cif``)
+            shipped in the same upload. The file is copied next to the
+            generated ``.archive.yaml`` (and included in the upload zip
+            when ``create_zip=True``), parsed locally with ASE, and
+            embedded as an inline top-level ``run`` section in the
+            archive. The standard NOMAD normalizer chain
+            (Optimade/Results/Metainfo) then populates the
+            material/optimade results server-side, so the entry
+            overview shows a 3-D structure preview. The
+            ``ElnWithStructureFile`` base section is deliberately NOT
+            used: it fails deterministically on nomad-lab 2.0.0 during
+            archive persistence (``AttributeError: qualified_name``).
+            Note that NOMAD does not re-read the structure file at
+            upload time: the preview data is fixed when the archive
+            is generated — regenerate the archive after changing the
+            file.
 
         **metadata:
             Pre-filled metadata fields.  All keyword arguments are passed
@@ -459,6 +602,7 @@ def to_nomad(
     if metadata.get("section_name"):
         schema_kwargs["section_name"] = metadata["section_name"]
     extra_quantities: dict[str, dict] = {}
+    hdf_quantity_annotations: dict[str, dict] = {}
     extra_data: dict[str, str] = {}
     extra_base_sections: list[str] = []
     include_entity_values = True
@@ -527,55 +671,88 @@ def to_nomad(
                 if isinstance(path, str) and isinstance(attrs, dict):
                     dataset_attrs_by_path[path] = attrs
 
-        def _set_hdf_path_for_quantity(qname: str) -> None:
-            path_candidate = f"/{qname}"
-            if path_candidate in dataset_paths:
-                qdef = extra_quantities.get(qname)
-                if qdef is None:
-                    qdef = {}
-                anns = qdef.get("m_annotations", {})
-                anns["hdf5"] = {"path": path_candidate}
-                qdef["m_annotations"] = anns
+        def _set_hdf_path_for_quantity(qualified_name: str, hdf_path: str) -> None:
+            """Attach an ``m_annotations.hdf5.path`` entry for a quantity.
 
-                # Prefer ontology metadata directly from HDF dataset attributes.
-                attrs = dataset_attrs_by_path.get(path_candidate, {})
-                if isinstance(attrs, dict):
-                    desc_parts: list[str] = []
-                    raw_desc = attrs.get("description")
-                    if isinstance(raw_desc, str) and raw_desc.strip():
-                        desc_parts.append(raw_desc.strip())
-                    raw_label = attrs.get("ontology_label")
-                    if isinstance(raw_label, str) and raw_label.strip():
-                        desc_parts.append(f"ontology: {raw_label.strip()}")
-                    raw_iri = attrs.get("ontology_iri")
-                    if isinstance(raw_iri, str) and raw_iri.strip():
-                        desc_parts.append(f"IRI: {raw_iri.strip()}")
-                    if desc_parts:
-                        qdef["description"] = " | ".join(desc_parts)
+            Args:
+                qualified_name: Dotted schema location of the quantity (e.g.
+                    ``material.unit_cell.cell_volume``); a name without a dot
+                    addresses a top-level quantity.
+                hdf_path: Absolute path of the dataset inside the HDF file
+                    (e.g. ``/material/unit_cell/cell_volume``).
+            """
+            if hdf_path not in dataset_paths:
+                return
+            qextra: dict = {"m_annotations": {"hdf5": {"path": hdf_path}}}
 
-                extra_quantities[qname] = qdef
+            # Prefer ontology metadata directly from HDF dataset attributes.
+            attrs = dataset_attrs_by_path.get(hdf_path, {})
+            if isinstance(attrs, dict):
+                desc_parts: list[str] = []
+                raw_desc = attrs.get("description")
+                if isinstance(raw_desc, str) and raw_desc.strip():
+                    desc_parts.append(raw_desc.strip())
+                raw_label = attrs.get("ontology_label")
+                if isinstance(raw_label, str) and raw_label.strip():
+                    desc_parts.append(f"ontology: {raw_label.strip()}")
+                raw_iri = attrs.get("ontology_iri")
+                if isinstance(raw_iri, str) and raw_iri.strip():
+                    desc_parts.append(f"IRI: {raw_iri.strip()}")
+                if desc_parts:
+                    qextra["description"] = " | ".join(desc_parts)
 
-        # Build annotations for all collection-derived quantity names
-        if isinstance(data, me.EntityCollection):
-            for ename, entity_like in data:
+            if "." in qualified_name:
+                # Nested quantity: merged into the sub-section tree later.
+                hdf_quantity_annotations[qualified_name] = qextra
+                return
+
+            qdef = extra_quantities.get(qualified_name)
+            if qdef is None:
+                qdef = {}
+            anns = qdef.get("m_annotations", {})
+            anns.update(qextra["m_annotations"])
+            qdef["m_annotations"] = anns
+            if "description" in qextra:
+                qdef["description"] = qextra["description"]
+            extra_quantities[qualified_name] = qdef
+
+        def _walk_collection_for_hdf_paths(
+            coll: me.EntityCollection,
+            prefix: str = "",
+            hdf_prefix: str = "",
+        ) -> None:
+            """Recursively map every entity of a collection to its HDF path."""
+            for name, entity_like in coll:
+                qualified_name = f"{prefix}.{name}" if prefix else name
                 if isinstance(entity_like, me.EntityCollection):
-                    for sub_name, sub_entity in entity_like:
-                        if isinstance(sub_entity, me.EntityCollection):
-                            continue
-                        _set_hdf_path_for_quantity(f"{ename}__{sub_name}")
+                    _walk_collection_for_hdf_paths(
+                        entity_like,
+                        prefix=qualified_name,
+                        hdf_prefix=f"{hdf_prefix}/{name}",
+                    )
                 else:
-                    _set_hdf_path_for_quantity(ename)
+                    _set_hdf_path_for_quantity(
+                        qualified_name, f"{hdf_prefix}/{name}"
+                    )
+
+        # Build annotations for all collection-derived quantity names,
+        # including arbitrarily nested sub-collections.
+        if isinstance(data, me.EntityCollection):
+            _walk_collection_for_hdf_paths(data)
         elif isinstance(data, me.Entity):
-            _set_hdf_path_for_quantity(data.ontology_label)
+            _set_hdf_path_for_quantity(
+                data.ontology_label, f"/{data.ontology_label}"
+            )
 
     if (
         file_reference_mode
         and source_path
         and source_suffix in {".csv", ".yaml", ".yml"}
     ):
-        # CSV can be parsed by NOMAD tabular annotations, so values do not need
-        # to be inlined. YAML has no equivalent built-in parser mapping here,
-        # therefore keep inline values to avoid unresolved (grayed out) fields.
+        # MaMMoS CSV can be parsed by NOMAD tabular annotations, so values do
+        # not need to be inlined. mammos-entity YAML data files have no
+        # equivalent built-in parser mapping, therefore keep inline values
+        # to avoid unresolved (grayed out) fields.
         include_entity_values = source_suffix in {".yaml", ".yml"}
         extra_quantities["data_file"] = {
             "type": "str",
@@ -595,7 +772,7 @@ def to_nomad(
                         for sub_name, sub_entity in entity_like:
                             if isinstance(sub_entity, me.EntityCollection):
                                 continue
-                            quantity_names.append(f"{ename}__{sub_name}")
+                            quantity_names.append(f"{ename}.{sub_name}")
                     else:
                         quantity_names.append(ename)
             elif isinstance(data, me.Entity):
@@ -685,9 +862,35 @@ def to_nomad(
             hdf_meta_for_json, ensure_ascii=False
         )
 
+    copied_structure_file: Path | None = None
+    structure_run_section: dict[str, Any] | None = None
+    if structure_file is not None:
+        structure_source = Path(structure_file)
+        if not structure_source.is_file():
+            raise FileNotFoundError(f"structure_file not found: {structure_source}")
+        # Copy next to the archive so the local directory mirrors the
+        # upload layout; the file ships as raw data (provenance and
+        # download fallback).
+        out_dir = Path(output).resolve().parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        copied_structure_file = out_dir / structure_source.name
+        shutil.copyfile(structure_source, copied_structure_file)
+        # Parse locally with ASE and embed the structure as an inline
+        # top-level run section: the standard NOMAD normalizer chain
+        # populates the structure-preview data server-side. The
+        # ElnWithStructureFile base section is NOT used (it fails on
+        # nomad-lab 2.0.0 with 'AttributeError: qualified_name').
+        structure_run_section = _structure_run_section(structure_source)
+        extra_quantities["structure_file"] = {
+            "type": "str",
+            "description": "Structure file shipped with this entry (upload-relative name).",
+        }
+        extra_data["structure_file"] = copied_structure_file.name
+
     archive = generate_archive(
         data,
         extra_quantities=extra_quantities or None,
+        hdf_quantity_annotations=hdf_quantity_annotations or None,
         extra_data=extra_data or None,
         extra_base_sections=extra_base_sections or None,
         include_entity_values=include_entity_values,
@@ -703,8 +906,24 @@ def to_nomad(
             "to_nomad_version": _safe_to_nomad_version(),
         },
         include_ontology_in_yaml=include_ontology_in_yaml,
+        map_collection_with_ontology=map_collection_with_ontology,
+        plots=plots,
         **schema_kwargs,
     )
+
+    if structure_run_section is not None:
+        archive["run"] = [structure_run_section]
+        # The archive parser adopts the domain from the archive's own
+        # metadata block (nomad/parsing/parser.py, ArchiveParser):
+        # the server-side normalizer filter then runs the
+        # domain='dft' OptimadeNormalizer, which populates
+        # metadata.optimade from the inline run (the structure preview
+        # data). Without this block the parser domain stays None and
+        # the OptimadeNormalizer is skipped.
+        archive["metadata"] = {"domain": "dft"}
+
+    if plots and source_path and source_suffix in normalizer_suffixes:
+        _apply_nexus_plot_attributes(source_path, plots)
 
     # Write to file
     out_path = save_archive_yaml(archive, output)
@@ -723,6 +942,8 @@ def to_nomad(
         files_to_zip: list[Path] = [out_path]
         if zip_data_files:
             files_to_zip.extend(Path(f) for f in zip_data_files)
+        if copied_structure_file is not None:
+            files_to_zip.append(copied_structure_file)
 
         create_upload_zip(*files_to_zip, output_path=zip_path)
         print(f"Upload zip created:      {zip_path}")

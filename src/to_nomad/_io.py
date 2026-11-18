@@ -39,7 +39,7 @@ def _represent_sequence(dumper: yaml.Dumper, value: list | tuple) -> yaml.Node:
 
 
 def _represent_str(dumper: yaml.Dumper, value: str) -> yaml.Node:
-    style = "|" if "\n" in value else None
+    style = "|" if "\n" in value else '"'
     return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
 
 
